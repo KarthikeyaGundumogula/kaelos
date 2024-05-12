@@ -10,7 +10,7 @@ pragma solidity ^0.8.20;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-contract Kel is ERC20 {
+contract KelCoin is ERC20 {
     error KelError_UnAuthorizedMinter();
 
     constructor() ERC20("Kel StableCoin", "KEL") {}
