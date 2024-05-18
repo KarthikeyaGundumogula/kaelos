@@ -27,6 +27,7 @@ contract SolvencyStation {
 
     uint256 public constant PRECISION = 10e27;
     uint256 private constant ADDITIONAL_FEED_PRECISION = 10e10;
+    uint256 private constant DECIMAL_PRECISION = 10e18;
     uint256 public s_kelCoinValue;
     HeadStation private headStation;
     bool public s_status;
@@ -87,7 +88,7 @@ contract SolvencyStation {
         s_kelCoinValue = _newValue;
     }
 
-    function updateSafetyIndex(
+    function updateLiquidationThreshold(
         bytes32 _collateralType,
         uint256 _newThreshold
     ) external authorize {
@@ -96,16 +97,5 @@ contract SolvencyStation {
         }
         s_collateralTokens[_collateralType]
             .liquidationThreshold = _newThreshold;
-    }
-
-    //--Price--//
-    function currentPriceInUSD(
-        bytes32 _collateralType
-    ) external view returns (uint256 currentPrice) {
-        AggregatorV3Interface priceFeed = AggregatorV3Interface(
-            s_collateralTokens[_collateralType].priceFeed
-        );
-        (, int price, , , ) = priceFeed.staleCheckLatestRoundData();
-        currentPrice = (uint(price) * ADDITIONAL_FEED_PRECISION);
     }
 }

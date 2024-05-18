@@ -22,19 +22,39 @@ interface KelCoin {
 }
 
 interface HeadStation {
-    function slip(bytes32, address, int) external;
+    function depositCollateral(
+        bytes32 _collateralType,
+        uint256 _amount,
+        address _user
+    ) external;
 
-    function move(address, address, uint) external;
+    function withdrawCollateral(
+        bytes32 _collateralType,
+        uint256 _amount,
+        address _user
+    ) external;
+
+    function depositKSC(
+        bytes32 _collateralType,
+        uint256 _amount,
+        address _user
+    ) external;
+
+    function withdrawKSC(
+        bytes32 _collateralType,
+        uint256 _amount,
+        address _user
+    ) external;
 }
 
 /**
- * @notice this Contract handles the deposit and witdrawl of Kel Coin 
+ * @notice this Contract handles the deposit and witdrawl of Kel Coin
  */
 contract KelCoinTeller {
     error KelTellerStationError_UnAuthorizedOperation();
-    error KelTellerStationError_PausedWithdrawls(); 
+    error KelTellerStationError_PausedWithdrawls();
 
-    uint256 private constant HEADSTATIONPRESICION = 10**27;
+    uint256 private constant HEADSTATIONPRESICION = 10 ** 27;
     KelCoin public kelCoin;
     HeadStation public headStation;
     bool public s_status;
@@ -67,30 +87,42 @@ contract KelCoinTeller {
         }
         _;
     }
+
     function addAuthorizedAddress(address user) external authorize {
         s_authorizedAddresses[user] = true;
         emit AuthorizedAddressAdded(user);
     }
+
     function removeAuthorizedAddress(address user) external authorize {
         s_authorizedAddresses[user] = false;
         emit AuthorizedAddressRemoved(user);
     }
+
     function changeStatus() external authorize {
         s_status = !s_status;
         emit StausUpdated(s_status);
     }
 
     //--Deposit & Withdraw KelCoin--//
-    function depositKelCoin(address _user, uint _amount) external {
-        headStation.move(address(this), _user, multiply(_amount, HEADSTATIONPRESICION));
+    function depositKelCoin(
+        address _user,
+        uint _amount,
+        bytes32 _collateralType
+    ) external {
+        headStation.depositKSC(_collateralType, _amount, _user);
         kelCoin.burn(msg.sender, _amount);
         emit KelCoinDeposited(_user, _amount);
     }
-    function withdrawKelCoin(address _user, uint _amount) external {
-        if(s_status == false) {
+
+    function withdrawKelCoin(
+        address _user,
+        uint _amount,
+        bytes32 _collateralType
+    ) external {
+        if (s_status == false) {
             revert KelTellerStationError_PausedWithdrawls();
         }
-        headStation.move(_user, address(this), multiply(_amount, HEADSTATIONPRESICION));
+        headStation.withdrawKSC(_collateralType, _amount, _user);
         kelCoin.mint(msg.sender, _amount);
         emit KelCoinWithdrawn(_user, _amount);
     }
@@ -103,7 +135,7 @@ contract CollateralTeller {
     error CollateralTellerError_CollateralTransferFailed();
     error CollateralTellerError_AmountOverFlown();
 
-    uint256 private constant HEADSTATIONPRECISION = 10**27;
+    uint256 private constant HEADSTATIONPRECISION = 10 ** 27;
     Collateral public collateralToken;
     bytes32 private s_collateralType;
     HeadStation public headStation;
@@ -118,7 +150,11 @@ contract CollateralTeller {
     event CollateralTokenWithdrawn(address user, uint amount);
     event StausUpdated(bool status);
 
-    constructor(address _headStation, bytes32 _collateralType, address _collateralAddress) {
+    constructor(
+        address _headStation,
+        bytes32 _collateralType,
+        address _collateralAddress
+    ) {
         s_authorizedAddresses[msg.sender] = true;
         s_status = true;
         headStation = HeadStation(_headStation);
@@ -130,19 +166,22 @@ contract CollateralTeller {
 
     //--Authorization & Adminstration--//
     modifier authorize() {
-        if(s_authorizedAddresses[msg.sender] != true) {
+        if (s_authorizedAddresses[msg.sender] != true) {
             revert CollateralTellerError_UnAuthorizedOperation();
         }
         _;
     }
+
     function addAuthorizedAddress(address user) external authorize {
         s_authorizedAddresses[user] = true;
         emit AuthorizedAddressAdded(user);
     }
+
     function removeAuthorizedAddresses(address user) external authorize {
         s_authorizedAddresses[user] = true;
         emit AuthorizedAddressRemoved(user);
     }
+
     function changeStatus() external authorize {
         s_status = !s_status;
         emit StausUpdated(s_status);
@@ -153,25 +192,30 @@ contract CollateralTeller {
         if (s_status == false) {
             revert CollateralTellerError_PausedWithDrawls();
         }
-        if(int(_amount)<0){
+        if (int(_amount) < 0) {
             revert CollateralTellerError_AmountLessThanZero();
         }
-        headStation.slip(s_collateralType,_user,int(_amount));
-        (bool success) = collateralToken.transferFrom(msg.sender,address(this),_amount);
-        if(!success){
+        headStation.depositCollateral(s_collateralType, _amount, _user);
+        bool success = collateralToken.transferFrom(
+            msg.sender,
+            address(this),
+            _amount
+        );
+        if (!success) {
             revert CollateralTellerError_CollateralTransferFailed();
         }
-        emit CollateralTokenDeposited(_user,_amount);
+        emit CollateralTokenDeposited(_user, _amount);
     }
+
     function withdrawCollateral(address _user, uint _amount) external {
-        if (_amount > type(uint256).max){
+        if (_amount > type(uint256).max) {
             revert CollateralTellerError_AmountOverFlown();
         }
-        headStation.slip(s_collateralType,msg.sender,-int(_amount));
-        (bool success) = collateralToken.transfer(_user,_amount);
-        if(!success) {
+        headStation.withdrawCollateral(s_collateralType, _amount, _user);
+        bool success = collateralToken.transfer(_user, _amount);
+        if (!success) {
             revert CollateralTellerError_CollateralTransferFailed();
         }
-        emit CollateralTokenWithdrawn(_user,_amount);
+        emit CollateralTokenWithdrawn(_user, _amount);
     }
 }
