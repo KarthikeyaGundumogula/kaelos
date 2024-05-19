@@ -4,13 +4,13 @@
  * @title Kel StableCoin
  * @author Karthikeya Gundumogula
  * @notice Authorization is required to mint, add authorized addresses and remove authorized addresses from the contract.
- * @dev This contract is an External Token facing users this token and internal balances maintained by the HeadStation contract is connected by the 
+ * @dev This contract is an External Token facing users this token and internal balances maintained by the HeadStation contract is connected by the
  */
 pragma solidity ^0.8.20;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-contract KelCoin is ERC20 {
+contract KelStableCoin is ERC20 {
     error KelError_UnAuthorizedMinter();
 
     constructor() ERC20("Kel StableCoin", "KEL") {}

@@ -136,6 +136,11 @@ contract HeadStation {
         _revertIfSafetyIndexIsBroken(_collateralType, _user);
     }
 
+    //external view functions
+    function getSafetyIndexOfReserve(bytes32 _collateralId,address _user) external view returns(uint256 safetyIndex){
+        safetyIndex = _calculateSafetyIndex(_collateralId,_user);
+    }
+
     //internal and helper functions
     function _calculateSafetyIndex(
         bytes32 _collateralType,
