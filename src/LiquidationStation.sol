@@ -33,6 +33,7 @@ contract LiquidationStation {
     error LiquidationStationError_UnAuthorizedOperation();
     error LiquidationStationError_UnRecognizedOperation();
     error LiquidationStationError_LiquidationChargeUnderFlow();
+    error  LiquidationStationError_ReserveIsHealthy();
 
     struct Collateral {
         address auctionHouse;
@@ -119,10 +120,18 @@ contract LiquidationStation {
         emit feildUpdated(_collateralId, _feild, _value);
     }
 
+    function liquidateReserve(bytes32 _collateralId, address _user) external {
+        uint256 safetyIndex = s_headStation.getSafetyIndex(_collateralId,_user);
+        if(safetyIndex > 1){
+            revert LiquidationStationError_ReserveIsHealthy();
+        }
+    }
+
     //--external view functions--//
     function getLiquidationChargeForCollateral(
         bytes32 _collateralID
     ) external view returns (uint256 charge) {
         charge = s_collaterals[_collateralID].liquidationCharge;
     }
+
 }

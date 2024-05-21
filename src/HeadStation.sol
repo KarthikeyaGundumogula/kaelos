@@ -12,6 +12,7 @@ import {PriceFeedLib} from "./libraries/PriceFeedLib.sol";
 
 contract HeadStation {
     error HeadStationError_UnAuthorizedOperation();
+    error HeadStationError_ReserveIsSafe();
     error HeadStationError_CollateralAlreadyInitialized();
     error HeadStationError_SafetyIndexLessThanOne(uint safetyIndex);
     error HeadStationError_UnRecognizedOperation();
@@ -20,7 +21,7 @@ contract HeadStation {
         uint256 totalDebtOnThisCollateral;
         uint256 upperLimitOnCollateral;
         uint256 minDebtOnCollateral;
-        uint256 stabilityFee; //calculated persecond
+        uint256 stabilityRate; //calculated perseconds
         uint256 liquidationThreshold;
         address priceFeedAddress;
     }
@@ -66,25 +67,25 @@ contract HeadStation {
         bytes32 _collateralId,
         address _priceFeedaddress
     ) external authenticate {
-        if (s_collaterals[_collateralId].stabilityFee != 0) {
+        if (s_collaterals[_collateralId].stabilityRate != 0) {
             revert HeadStationError_CollateralAlreadyInitialized();
         }
         s_collaterals[_collateralId].priceFeedAddress = _priceFeedaddress;
     }
 
     function updateCollateralToken(
-        bytes32 _collateralType,
+        bytes32 _collateralId,
         bytes32 _feild,
         uint256 _value
     ) external authenticate {
         if (_feild == "upperLimit") {
-            s_collaterals[_collateralType].upperLimitOnCollateral = _value;
+            s_collaterals[_collateralId].upperLimitOnCollateral = _value;
         } else if (_feild == "lowerLimit") {
-            s_collaterals[_collateralType].minDebtOnCollateral = _value;
+            s_collaterals[_collateralId].minDebtOnCollateral = _value;
         } else if (_feild == "liquidationThreshold") {
-            s_collaterals[_collateralType].liquidationThreshold = _value;
-        } else if(_feild == "stabilityFee") {
-            s_collaterals[_collateralType].stabilityFee = _value;
+            s_collaterals[_collateralId].liquidationThreshold = _value;
+        } else if (_feild == "stabilityFee") {
+            s_collaterals[_collateralId].stabilityRate = _value;
         } else {
             revert HeadStationError_UnRecognizedOperation();
         }
@@ -136,9 +137,44 @@ contract HeadStation {
         _revertIfSafetyIndexIsBroken(_collateralType, _user);
     }
 
+    function confiscateReserve(
+        bytes32 _collateralId,
+        address _reserveOwner,
+        address _auctionHouse,
+        address _vow,
+        int256 _collateral,
+        int256 _debtKSC
+    ) external {
+        uint256 safetyIndex = _calculateSafetyIndex(
+            _collateralId,
+            _reserveOwner
+        );
+        if (safetyIndex > 1) {
+            revert HeadStationError_ReserveIsSafe();
+        }
+        s_reserves[_collateralId][_reserveOwner]._totalCollateral = _sub(
+            s_reserves[_collateralId][_reserveOwner]._totalCollateral,
+            _collateral
+        );
+        s_reserves[_collateralId][_reserveOwner]._totalKSCMinted = _sub(
+            s_reserves[_collateralId][_reserveOwner]._totalKSCMinted,
+            _debtKSC
+        );
+    }
+
     //external view functions
-    function getSafetyIndexOfReserve(bytes32 _collateralId,address _user) external view returns(uint256 safetyIndex){
-        safetyIndex = _calculateSafetyIndex(_collateralId,_user);
+    function getSafetyIndexOfReserve(
+        bytes32 _collateralId,
+        address _user
+    ) external view returns (uint256 safetyIndex) {
+        safetyIndex = _calculateSafetyIndex(_collateralId, _user);
+    }
+
+    function getCollateralTokenData(
+        bytes32 _collateralID
+    ) external view returns (uint256 totalDebt, uint256 stabilityRate) {
+        totalDebt = s_collaterals[_collateralID].totalDebtOnThisCollateral;
+        stabilityRate = s_collaterals[_collateralID].stabilityRate;
     }
 
     //internal and helper functions

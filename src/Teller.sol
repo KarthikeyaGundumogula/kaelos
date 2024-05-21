@@ -55,8 +55,8 @@ contract KelCoinTeller {
     error KelTellerStationError_PausedWithdrawls();
 
     uint256 private constant HEADSTATIONPRESICION = 10 ** 27;
-    KelCoin public kelCoin;
-    HeadStation public headStation;
+    KelCoin public s_kelCoin;
+    HeadStation public s_headStation;
     bool public s_status;
     mapping(address user => bool authorized) private s_authorizedAddresses;
 
@@ -68,8 +68,8 @@ contract KelCoinTeller {
     event StausUpdated(bool status);
 
     constructor(address _kelCoin, address _headStation) {
-        kelCoin = KelCoin(_kelCoin);
-        headStation = HeadStation(_headStation);
+        s_kelCoin = KelCoin(_kelCoin);
+        s_headStation = HeadStation(_headStation);
         s_authorizedAddresses[msg.sender] = true;
         emit AuthorizedAddressAdded(msg.sender);
     }
@@ -109,8 +109,8 @@ contract KelCoinTeller {
         uint _amount,
         bytes32 _collateralType
     ) external {
-        headStation.depositKSC(_collateralType, _amount, _user);
-        kelCoin.burn(msg.sender, _amount);
+        s_headStation.depositKSC(_collateralType, _amount, _user);
+        s_kelCoin.burn(msg.sender, _amount);
         emit KelCoinDeposited(_user, _amount);
     }
 
@@ -122,8 +122,8 @@ contract KelCoinTeller {
         if (s_status == false) {
             revert KelTellerStationError_PausedWithdrawls();
         }
-        headStation.withdrawKSC(_collateralType, _amount, _user);
-        kelCoin.mint(msg.sender, _amount);
+        s_headStation.withdrawKSC(_collateralType, _amount, _user);
+        s_kelCoin.mint(msg.sender, _amount);
         emit KelCoinWithdrawn(_user, _amount);
     }
 }
@@ -138,7 +138,7 @@ contract CollateralTeller {
     uint256 private constant HEADSTATIONPRECISION = 10 ** 27;
     Collateral public collateralToken;
     bytes32 private s_collateralType;
-    HeadStation public headStation;
+    HeadStation public s_headStation;
     uint256 private s_collateralDecimals;
     bool public s_status;
     mapping(address user => bool authorized) public s_authorizedAddresses;
@@ -157,7 +157,7 @@ contract CollateralTeller {
     ) {
         s_authorizedAddresses[msg.sender] = true;
         s_status = true;
-        headStation = HeadStation(_headStation);
+        s_headStation = HeadStation(_headStation);
         s_collateralType = _collateralType;
         collateralToken = Collateral(_collateralAddress);
         s_collateralDecimals = collateralToken.decimals();
@@ -195,7 +195,7 @@ contract CollateralTeller {
         if (int(_amount) < 0) {
             revert CollateralTellerError_AmountLessThanZero();
         }
-        headStation.depositCollateral(s_collateralType, _amount, _user);
+        s_headStation.depositCollateral(s_collateralType, _amount, _user);
         bool success = collateralToken.transferFrom(
             msg.sender,
             address(this),
@@ -211,7 +211,7 @@ contract CollateralTeller {
         if (_amount > type(uint256).max) {
             revert CollateralTellerError_AmountOverFlown();
         }
-        headStation.withdrawCollateral(s_collateralType, _amount, _user);
+        s_headStation.withdrawCollateral(s_collateralType, _amount, _user);
         bool success = collateralToken.transfer(_user, _amount);
         if (!success) {
             revert CollateralTellerError_CollateralTransferFailed();

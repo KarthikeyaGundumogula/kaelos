@@ -3,34 +3,26 @@
 /**
  * @title SolvencyStation
  * @author Karthikeya Gundumogula
- * @notice This contract handles the current prices of Collaterals and calculates the Safety Index for the given Reserve
+ * @notice This contract handles the current prices of Collaterals and calculates the stability rate for the given Reserve
  */
 
 pragma solidity ^0.8.20;
-import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
-import {PriceFeedLib} from "./libraries/PriceFeedLib.sol";
-
-interface HeadStation {
-    function file(bytes32, bytes32, uint) external;
-}
 
 contract SolvencyStation {
     error SolvencyStationError_UnAuthorizedOperation();
+    error SolvencyStationError_InvalidCollateral();
+    error SolvencyStationError_CollateralAlreadyInitialized();
     error SolvencyStationError_StationNotLive();
 
-    using PriceFeedLib for AggregatorV3Interface;
-
     struct Collateral {
-        address priceFeed;
-        uint256 liquidationThreshold;
+        uint256 stabilityFee;
+        uint256 lastUpdate;
     }
 
     uint256 public constant PRECISION = 10e27;
     uint256 private constant ADDITIONAL_FEED_PRECISION = 10e10;
     uint256 private constant DECIMAL_PRECISION = 10e18;
-    uint256 public s_kelCoinValue;
-    HeadStation private headStation;
-    bool public s_status;
+    uint256 public s_baseStabilityFee; //protocol level
     mapping(bytes32 collateralType => Collateral data)
         public s_collateralTokens;
     mapping(address user => bool authorized) public s_authorizedAddresses;
@@ -40,62 +32,131 @@ contract SolvencyStation {
     event AuthorizedAddressAdded(address user);
     event AuthorizedAddressRemoved(address user);
 
-    constructor(address _headStation) {
-        headStation = HeadStation(_headStation);
+    constructor() {
         s_authorizedAddresses[msg.sender] = true;
-        s_status = true;
-        s_kelCoinValue = PRECISION;
-        emit StatusUpdated(s_status);
     }
 
     //--Authorization & Administration--//
-    modifier authorize() {
+    modifier authenticate() {
         if (s_authorizedAddresses[msg.sender] != true) {
             revert SolvencyStationError_UnAuthorizedOperation();
         }
         _;
     }
 
-    function addAuthorizedAddress(address _user) external authorize {
+    function addAuthorizedAddress(address _user) external authenticate {
         s_authorizedAddresses[_user] = true;
         emit AuthorizedAddressAdded(_user);
     }
 
-    function removeAuthorizedAddress(address _user) external authorize {
+    function removeAuthorizedAddress(address _user) external authenticate {
         s_authorizedAddresses[_user] = false;
         emit AuthorizedAddressRemoved(_user);
     }
 
-    function updateStatus() external authorize {
-        s_status = !s_status;
-        emit StatusUpdated(s_status);
+    function updateBaseStabilityFee(uint256 _newValue) external authenticate {
+        s_baseStabilityFee = _newValue;
     }
 
-    function updateCollateralPriceFeed(
-        address _newPriceFeed,
-        bytes32 _collateralType
-    ) external authorize {
-        if (s_status != true) {
-            revert SolvencyStationError_StationNotLive();
+    function initNewCollateralType(
+        bytes32 _collateralId,
+        uint256 _stabilityFee
+    ) external authenticate {
+        if (s_collateralTokens[_collateralId].stabilityFee != 0) {
+            revert SolvencyStationError_CollateralAlreadyInitialized();
         }
-        s_collateralTokens[_collateralType].priceFeed = _newPriceFeed;
+        s_collateralTokens[_collateralId].stabilityFee =
+            _stabilityFee *
+            PRECISION;
+        s_collateralTokens[_collateralId].lastUpdate = block.timestamp;
     }
 
-    function updateKelCoinValue(uint256 _newValue) external authorize {
-        if (s_status != true) {
-            revert SolvencyStationError_StationNotLive();
+    function calculateStabilityRate(
+        bytes32 _collateralId,
+        uint256 _oldRate
+    ) external returns (uint256 newRate) {
+        if (block.timestamp <= s_collateralTokens[_collateralId].lastUpdate) {
+            revert SolvencyStationError_InvalidCollateral();
         }
-        s_kelCoinValue = _newValue;
+        newRate = _rmul(
+            _rpow(
+                _add(
+                    s_baseStabilityFee,
+                    s_collateralTokens[_collateralId].stabilityFee
+                ),
+                block.timestamp - s_collateralTokens[_collateralId].lastUpdate,
+                PRECISION
+            ),
+            _oldRate
+        );
+        s_collateralTokens[_collateralId].lastUpdate = block.timestamp;
     }
 
-    function updateLiquidationThreshold(
-        bytes32 _collateralType,
-        uint256 _newThreshold
-    ) external authorize {
-        if (s_status != true) {
-            revert SolvencyStationError_StationNotLive();
+    // --- Math ---
+    function _rpow(uint x, uint n, uint b) internal pure returns (uint z) {
+        assembly {
+            switch x
+            case 0 {
+                switch n
+                case 0 {
+                    z := b
+                }
+                default {
+                    z := 0
+                }
+            }
+            default {
+                switch mod(n, 2)
+                case 0 {
+                    z := b
+                }
+                default {
+                    z := x
+                }
+                let half := div(b, 2) // for rounding.
+                for {
+                    n := div(n, 2)
+                } n {
+                    n := div(n, 2)
+                } {
+                    let xx := mul(x, x)
+                    if iszero(eq(div(xx, x), x)) {
+                        revert(0, 0)
+                    }
+                    let xxRound := add(xx, half)
+                    if lt(xxRound, xx) {
+                        revert(0, 0)
+                    }
+                    x := div(xxRound, b)
+                    if mod(n, 2) {
+                        let zx := mul(z, x)
+                        if and(iszero(iszero(x)), iszero(eq(div(zx, x), z))) {
+                            revert(0, 0)
+                        }
+                        let zxRound := add(zx, half)
+                        if lt(zxRound, zx) {
+                            revert(0, 0)
+                        }
+                        z := div(zxRound, b)
+                    }
+                }
+            }
         }
-        s_collateralTokens[_collateralType]
-            .liquidationThreshold = _newThreshold;
+    }
+
+    function _add(uint x, uint y) internal pure returns (uint z) {
+        z = x + y;
+        require(z >= x);
+    }
+
+    function _diff(uint x, uint y) internal pure returns (int z) {
+        z = int(x) - int(y);
+        require(int(x) >= 0 && int(y) >= 0);
+    }
+
+    function _rmul(uint x, uint y) internal pure returns (uint z) {
+        z = x * y;
+        require(y == 0 || z / y == x);
+        z = z / PRECISION;
     }
 }
