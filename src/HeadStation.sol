@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: MIT
 /**
  * @title HeadStation
- * @author KAarthikeya Gundumogula
+ * @author Karthikeya Gundumogula
  * @notice This is the core station of the Kel Stable Coin
  * @dev this contract stores the state of the Utopia Ecosystem
  */
@@ -10,15 +10,27 @@ pragma solidity ^0.8.20;
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import {PriceFeedLib} from "./libraries/PriceFeedLib.sol";
 
+interface IRateAggregator {
+    function calculateStabilityRate(
+        bytes32 _collateralId,
+        uint256 _oldRate
+    ) external returns (uint256 newRate);
+}
+
 contract HeadStation {
     error HeadStationError_UnAuthorizedOperation();
     error HeadStationError_ReserveIsSafe();
     error HeadStationError_CollateralAlreadyInitialized();
     error HeadStationError_SafetyIndexLessThanOne(uint safetyIndex);
     error HeadStationError_UnRecognizedOperation();
+    error HeadStationError_UnRecognozedCollateralType();
 
+    /**
+     * @dev in this struct we store normalized debt which is totaldebt/stabilityRate
+     * @dev to get the debt of an reserve or an collateral at any point just multiply the normalizedDebt with the stabilityRate at that point of time
+     */
     struct CollateralType {
-        uint256 totalDebtOnThisCollateral;
+        uint256 totalDebtOnThisCollateral; //normalized to stability rate
         uint256 upperLimitOnCollateral;
         uint256 minDebtOnCollateral;
         uint256 stabilityRate; //calculated perseconds
@@ -31,7 +43,9 @@ contract HeadStation {
     }
 
     using PriceFeedLib for AggregatorV3Interface;
+    IRateAggregator private rateAggregator;
     uint256 private constant THRESHOLD_PRECISION = 100;
+    uint256 public s_totalKSCIssued;
     uint256 public TotalDebtCeiling;
     mapping(bytes32 collateralId => CollateralType collateral)
         private s_collaterals;
@@ -39,8 +53,9 @@ contract HeadStation {
         private s_reserves;
     mapping(address user => bool allowed) public s_authorizedAddresses;
 
-    constructor() {
+    constructor(address _rateAggregator) {
         s_authorizedAddresses[msg.sender] = true;
+        rateAggregator = IRateAggregator(_rateAggregator);
     }
 
     //--Events--//
@@ -95,7 +110,10 @@ contract HeadStation {
         bytes32 _collateralType,
         uint256 _amount,
         address _user
-    ) external {
+    ) external authenticate {
+        if (s_collaterals[_collateralType].stabilityRate == 0) {
+            revert HeadStationError_UnRecognozedCollateralType();
+        }
         s_reserves[_collateralType][_user]._totalCollateral = _add(
             s_reserves[_collateralType][_user]._totalCollateral,
             _amount
@@ -106,7 +124,7 @@ contract HeadStation {
         bytes32 _collateralType,
         uint256 _amount,
         address _user
-    ) external {
+    ) external authenticate {
         s_reserves[_collateralType][_user]._totalCollateral = _sub(
             s_reserves[_collateralType][_user]._totalCollateral,
             _amount
@@ -115,36 +133,57 @@ contract HeadStation {
     }
 
     function depositKSC(
-        bytes32 _collateralType,
+        bytes32 _collateralId,
         uint256 _amount,
         address _user
-    ) external {
-        s_reserves[_collateralType][_user]._totalKSCMinted = _add(
-            s_reserves[_collateralType][_user]._totalKSCMinted,
-            _amount
+    ) external authenticate {
+        if (s_collaterals[_collateralId].stabilityRate == 0) {
+            revert HeadStationError_UnRecognozedCollateralType();
+        }
+        _updateRate(_collateralId);
+        s_totalKSCIssued = _sub(s_totalKSCIssued, _amount);
+        uint256 rate = s_collaterals[_collateralId].stabilityRate;
+        uint256 normalizedAmount = _amount / rate;
+        s_reserves[_collateralId][_user]._totalKSCMinted = _sub(
+            s_reserves[_collateralId][_user]._totalKSCMinted,
+            normalizedAmount
+        );
+        s_collaterals[_collateralId].totalDebtOnThisCollateral = _sub(
+            s_collaterals[_collateralId].totalDebtOnThisCollateral,
+            normalizedAmount
         );
     }
 
     function withdrawKSC(
-        bytes32 _collateralType,
+        bytes32 _collateralId,
         uint256 _amount,
         address _user
-    ) external {
-        s_reserves[_collateralType][_user]._totalKSCMinted = _sub(
-            s_reserves[_collateralType][_user]._totalKSCMinted,
-            _amount
+    ) external authenticate {
+        if (s_collaterals[_collateralId].stabilityRate == 0) {
+            revert HeadStationError_UnRecognozedCollateralType();
+        }
+        _updateRate(_collateralId);
+        s_totalKSCIssued = _sub(s_totalKSCIssued, _amount);
+        uint256 rate = s_collaterals[_collateralId].stabilityRate;
+        uint256 normalizedAmount = _amount / rate;
+        s_reserves[_collateralId][_user]._totalKSCMinted = _add(
+            s_reserves[_collateralId][_user]._totalKSCMinted,
+            normalizedAmount
         );
-        _revertIfSafetyIndexIsBroken(_collateralType, _user);
+        s_collaterals[_collateralId].totalDebtOnThisCollateral = _add(
+            s_collaterals[_collateralId].totalDebtOnThisCollateral,
+            normalizedAmount
+        );
+        _revertIfSafetyIndexIsBroken(_collateralId, _user);
     }
 
     function confiscateReserve(
         bytes32 _collateralId,
         address _reserveOwner,
-        address _auctionHouse,
-        address _vow,
         int256 _collateral,
         int256 _debtKSC
     ) external {
+        _updateRate(_collateralId);
         uint256 safetyIndex = _calculateSafetyIndex(
             _collateralId,
             _reserveOwner
@@ -152,21 +191,16 @@ contract HeadStation {
         if (safetyIndex > 1) {
             revert HeadStationError_ReserveIsSafe();
         }
-        s_reserves[_collateralId][_reserveOwner]._totalCollateral = _sub(
-            s_reserves[_collateralId][_reserveOwner]._totalCollateral,
-            _collateral
-        );
-        s_reserves[_collateralId][_reserveOwner]._totalKSCMinted = _sub(
-            s_reserves[_collateralId][_reserveOwner]._totalKSCMinted,
-            _debtKSC
-        );
+        Reserve storage res = s_reserves[_collateralId][_reserveOwner];
+        res._totalCollateral = _sub(res._totalCollateral, _collateral);
+        res._totalKSCMinted = _sub(res._totalKSCMinted, _debtKSC);
     }
 
     //external view functions
     function getSafetyIndexOfReserve(
         bytes32 _collateralId,
         address _user
-    ) external view returns (uint256 safetyIndex) {
+    ) external returns (uint256 safetyIndex) {
         safetyIndex = _calculateSafetyIndex(_collateralId, _user);
     }
 
@@ -178,21 +212,41 @@ contract HeadStation {
     }
 
     //internal and helper functions
+
+    function _updateRate(bytes32 _collateralId) internal {
+        uint256 oldRate = s_collaterals[_collateralId].stabilityRate;
+        uint256 newRate = rateAggregator.calculateStabilityRate(
+            _collateralId,
+            oldRate
+        );
+        s_collaterals[_collateralId].stabilityRate = newRate;
+        uint256 totalDebtChange = _mul(
+            s_collaterals[_collateralId].totalDebtOnThisCollateral,
+            _sub(newRate, oldRate)
+        );
+        s_totalKSCIssued = _add(s_totalKSCIssued, totalDebtChange);
+    }
+
     function _calculateSafetyIndex(
-        bytes32 _collateralType,
+        bytes32 _collateralId,
         address _user
-    ) internal view returns (uint256 safetyIndex) {
-        uint256 collateralThreshold = s_collaterals[_collateralType]
+    ) internal returns (uint256 safetyIndex) {
+        _updateRate(_collateralId);
+        uint256 collateralThreshold = s_collaterals[_collateralId]
             .liquidationThreshold;
-        uint256 reserveCollateral = s_reserves[_collateralType][_user]
+        uint256 reserveCollateral = s_reserves[_collateralId][_user]
             ._totalCollateral;
-        uint256 reserveDebt = s_reserves[_collateralType][_user]
+        uint256 reserveNormalizedDebt = s_reserves[_collateralId][_user]
             ._totalKSCMinted;
+        uint256 reserveDebt = _mul(
+            reserveNormalizedDebt,
+            s_collaterals[_collateralId].stabilityRate
+        );
         if (reserveDebt <= 0) {
             return type(uint).max;
         }
         AggregatorV3Interface priceFeed = AggregatorV3Interface(
-            s_collaterals[_collateralType].priceFeedAddress
+            s_collaterals[_collateralId].priceFeedAddress
         );
         uint256 collateralValueInUSD = priceFeed.getUSDValueForTokenAmount(
             reserveCollateral
@@ -203,10 +257,10 @@ contract HeadStation {
     }
 
     function _revertIfSafetyIndexIsBroken(
-        bytes32 _collateralType,
+        bytes32 _collateralId,
         address _user
-    ) internal view {
-        uint safetyIndex = _calculateSafetyIndex(_collateralType, _user);
+    ) internal {
+        uint safetyIndex = _calculateSafetyIndex(_collateralId, _user);
         if (safetyIndex < 1) {
             revert HeadStationError_SafetyIndexLessThanOne(safetyIndex);
         }

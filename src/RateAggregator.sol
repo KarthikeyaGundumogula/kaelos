@@ -1,18 +1,18 @@
 //SPDX-License-Identifier: MIT
 
 /**
- * @title SolvencyStation
+ * @title RateAggregator
  * @author Karthikeya Gundumogula
- * @notice This contract handles the current prices of Collaterals and calculates the stability rate for the given Reserve
+ * @notice This contract calculates the stability rate for the given collateral
  */
 
 pragma solidity ^0.8.20;
 
-contract SolvencyStation {
-    error SolvencyStationError_UnAuthorizedOperation();
-    error SolvencyStationError_InvalidCollateral();
-    error SolvencyStationError_CollateralAlreadyInitialized();
-    error SolvencyStationError_StationNotLive();
+contract RateAggregator {
+    error RateAggregatorError_UnAuthorizedOperation();
+    error RateAggregatorError_InvalidCollateral();
+    error RateAggregatorError_CollateralAlreadyInitialized();
+    error RateAggregatorError_StationNotLive();
 
     struct Collateral {
         uint256 stabilityFee;
@@ -39,7 +39,7 @@ contract SolvencyStation {
     //--Authorization & Administration--//
     modifier authenticate() {
         if (s_authorizedAddresses[msg.sender] != true) {
-            revert SolvencyStationError_UnAuthorizedOperation();
+            revert RateAggregatorError_UnAuthorizedOperation();
         }
         _;
     }
@@ -63,7 +63,7 @@ contract SolvencyStation {
         uint256 _stabilityFee
     ) external authenticate {
         if (s_collateralTokens[_collateralId].stabilityFee != 0) {
-            revert SolvencyStationError_CollateralAlreadyInitialized();
+            revert RateAggregatorError_CollateralAlreadyInitialized();
         }
         s_collateralTokens[_collateralId].stabilityFee =
             _stabilityFee *
@@ -76,7 +76,7 @@ contract SolvencyStation {
         uint256 _oldRate
     ) external returns (uint256 newRate) {
         if (block.timestamp <= s_collateralTokens[_collateralId].lastUpdate) {
-            revert SolvencyStationError_InvalidCollateral();
+            return newRate = _oldRate;
         }
         newRate = _rmul(
             _rpow(
