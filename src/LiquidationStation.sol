@@ -13,11 +13,16 @@ interface IHeadStation {
         bytes32 id,
         address user
     ) external view returns (uint256 collateral, uint256 debt);
-
-    function getSafetyIndex(
-        bytes32 id,
-        address user
-    ) external view returns (uint256 safetyIndex);
+    function getSafetyIndexOfReserve(
+        bytes32 _collateralId,
+        address _user
+    ) external returns (uint256 safetyIndex, uint256 stabilityRate);
+    function confiscateReserve(
+        bytes32 _collateralId,
+        address _reserveOwner,
+        int256 _collateral,
+        int256 _debtKSC
+    ) external;
 }
 
 interface IAuctionHouse {
@@ -31,19 +36,21 @@ interface IAuctionHouse {
 
 contract LiquidationStation {
     error LiquidationStationError_UnAuthorizedOperation();
+    error LiquidationStationError_MaxDebtLimitExceeding();
     error LiquidationStationError_UnRecognizedOperation();
-    error LiquidationStationError_LiquidationChargeUnderFlow();
-    error  LiquidationStationError_ReserveIsHealthy();
+    error LiquidationStationError_liquidationPenaltyUnderFlow();
+    error LiquidationStationError_ReserveIsHealthy();
 
     struct Collateral {
         address auctionHouse;
-        uint256 liquidationCharge;
-        uint256 maxKSCLimitOnThisCollateral;
+        uint256 liquidationPenalty;
+        uint256 maxDebtLimitOnThisCollateral;
         uint256 kscNeededOnThisCollateal; //debt+fees(liquidation charges)
     }
 
     uint256 private constant TOKEN_PRECISION = 10e18;
     IHeadStation private immutable s_headStation;
+    IAuctionHouse private s_auctionHouse;
     mapping(address => bool) public s_authorizedAddresses;
     uint256 private maxKSCAllowed; //protocol level
     uint256 private totalKSCDebt; //protocol level
@@ -107,13 +114,13 @@ contract LiquidationStation {
         bytes32 _feild,
         uint256 _value
     ) external authenticate {
-        if (_feild == "liquidationCharge") {
+        if (_feild == "liquidationPenalty") {
             if (_value < TOKEN_PRECISION) {
-                revert LiquidationStationError_LiquidationChargeUnderFlow();
+                revert LiquidationStationError_liquidationPenaltyUnderFlow();
             }
-            s_collaterals[_collateralId].liquidationCharge = _value;
+            s_collaterals[_collateralId].liquidationPenalty = _value;
         } else if (_feild == "maxKSCLimit") {
-            s_collaterals[_collateralId].maxKSCLimitOnThisCollateral = _value;
+            s_collaterals[_collateralId].maxDebtLimitOnThisCollateral = _value;
         } else {
             revert LiquidationStationError_UnRecognizedOperation();
         }
@@ -121,17 +128,42 @@ contract LiquidationStation {
     }
 
     function liquidateReserve(bytes32 _collateralId, address _user) external {
-        uint256 safetyIndex = s_headStation.getSafetyIndex(_collateralId,_user);
-        if(safetyIndex > 1){
+        (uint256 safetyIndex, uint256 stabilityRate) = s_headStation
+            .getSafetyIndexOfReserve(_collateralId, _user);
+        if (safetyIndex > 1) {
             revert LiquidationStationError_ReserveIsHealthy();
         }
+        (uint collateral, uint normalizedDebt) = s_headStation.getReserves(
+            _collateralId,
+            _user
+        );
+        uint256 liquidationPenalty = s_collaterals[_collateralId]
+            .liquidationPenalty;
+        uint debt = normalizedDebt * stabilityRate;
+        debt += (debt * liquidationPenalty);
+        uint collateralDebt = debt +
+            s_collaterals[_collateralId].kscNeededOnThisCollateal;
+        uint systemDebt = totalKSCDebt + debt;
+        if (
+            collateralDebt >
+            s_collaterals[_collateralId].maxDebtLimitOnThisCollateral ||
+            systemDebt > maxKSCAllowed
+        ) {
+            revert LiquidationStationError_MaxDebtLimitExceeding();
+        }
+        s_headStation.confiscateReserve(
+            _collateralId,
+            _user,
+            int(collateral),
+            int(debt)
+        );
+        s_auctionHouse.startAuction(collateral, debt, _user, msg.sender);
     }
 
     //--external view functions--//
-    function getLiquidationChargeForCollateral(
+    function getliquidationPenaltyForCollateral(
         bytes32 _collateralID
     ) external view returns (uint256 charge) {
-        charge = s_collaterals[_collateralID].liquidationCharge;
+        charge = s_collaterals[_collateralID].liquidationPenalty;
     }
-
 }

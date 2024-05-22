@@ -17,6 +17,7 @@ interface IRateAggregator {
     ) external returns (uint256 newRate);
 }
 
+
 contract HeadStation {
     error HeadStationError_UnAuthorizedOperation();
     error HeadStationError_ReserveIsSafe();
@@ -63,25 +64,22 @@ contract HeadStation {
     event CollateralTokenUpdated(string feild, uint256 Value);
 
     //--Authentication & Administration--//
-    modifier authenticate() {
-        if (s_authorizedAddresses[msg.sender] != true) {
-            revert HeadStationError_UnAuthorizedOperation();
-        }
-        _;
-    }
-
-    function addAuthorizedAddress(address _user) external authenticate {
+    
+    function addAuthorizedAddress(address _user) external {
+        _authenticate();
         s_authorizedAddresses[_user] = true;
     }
 
-    function removeAuthorizedAddress(address _user) external authenticate {
+    function removeAuthorizedAddress(address _user) external  {
+        _authenticate();
         s_authorizedAddresses[_user] = false;
     }
 
     function initializeCollateralToken(
         bytes32 _collateralId,
         address _priceFeedaddress
-    ) external authenticate {
+    ) external  {
+        _authenticate();
         if (s_collaterals[_collateralId].stabilityRate != 0) {
             revert HeadStationError_CollateralAlreadyInitialized();
         }
@@ -92,7 +90,8 @@ contract HeadStation {
         bytes32 _collateralId,
         bytes32 _feild,
         uint256 _value
-    ) external authenticate {
+    ) external  {
+        _authenticate();
         if (_feild == "upperLimit") {
             s_collaterals[_collateralId].upperLimitOnCollateral = _value;
         } else if (_feild == "lowerLimit") {
@@ -110,7 +109,8 @@ contract HeadStation {
         bytes32 _collateralType,
         uint256 _amount,
         address _user
-    ) external authenticate {
+    ) external  {
+        _authenticate();
         if (s_collaterals[_collateralType].stabilityRate == 0) {
             revert HeadStationError_UnRecognozedCollateralType();
         }
@@ -124,7 +124,8 @@ contract HeadStation {
         bytes32 _collateralType,
         uint256 _amount,
         address _user
-    ) external authenticate {
+    ) external {
+        _authenticate();
         s_reserves[_collateralType][_user]._totalCollateral = _sub(
             s_reserves[_collateralType][_user]._totalCollateral,
             _amount
@@ -136,7 +137,8 @@ contract HeadStation {
         bytes32 _collateralId,
         uint256 _amount,
         address _user
-    ) external authenticate {
+    ) external  {
+        _authenticate();
         if (s_collaterals[_collateralId].stabilityRate == 0) {
             revert HeadStationError_UnRecognozedCollateralType();
         }
@@ -158,7 +160,8 @@ contract HeadStation {
         bytes32 _collateralId,
         uint256 _amount,
         address _user
-    ) external authenticate {
+    ) external  {
+        _authenticate();
         if (s_collaterals[_collateralId].stabilityRate == 0) {
             revert HeadStationError_UnRecognozedCollateralType();
         }
@@ -183,6 +186,7 @@ contract HeadStation {
         int256 _collateral,
         int256 _debtKSC
     ) external {
+        _authenticate();
         _updateRate(_collateralId);
         uint256 safetyIndex = _calculateSafetyIndex(
             _collateralId,
@@ -200,8 +204,9 @@ contract HeadStation {
     function getSafetyIndexOfReserve(
         bytes32 _collateralId,
         address _user
-    ) external returns (uint256 safetyIndex) {
+    ) external returns (uint256 safetyIndex,uint256 stabilityRate) {
         safetyIndex = _calculateSafetyIndex(_collateralId, _user);
+        stabilityRate = s_collaterals[_collateralId].stabilityRate;
     }
 
     function getCollateralTokenData(
@@ -212,7 +217,15 @@ contract HeadStation {
     }
 
     //internal and helper functions
-
+    /**
+     * @dev Internal function to check if the caller is authorized.
+     * Reverts with HeadStationError_UnAuthorizedOperation if the caller is not authorized.
+     */
+    function _authenticate() internal view {
+        if (!s_authorizedAddresses[msg.sender]) {
+            revert HeadStationError_UnAuthorizedOperation();
+        }
+    }
     function _updateRate(bytes32 _collateralId) internal {
         uint256 oldRate = s_collaterals[_collateralId].stabilityRate;
         uint256 newRate = rateAggregator.calculateStabilityRate(
