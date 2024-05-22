@@ -1,9 +1,21 @@
 //SPDX-License-Identifier: MIT
+
 /**
  * @title AuctionHouse
  * @author Karthikeya Gundumogula
- * @notice the Liquidation contract calls this contract to execute auctions 
+ * @dev The Liquidation contract calls this contract to execute auctions
  */
 pragma solidity ^0.8.20;
 
-contract AuctionHouse {}
+interface IRateAggregator {
+    function currentAuctionPrice(uint256 initialPrice, uint256 timeElapsed) external view returns(uint256 price);
+}
+
+contract AuctionHouse {
+
+    IRateAggregator private s_rateAggregator;
+
+    constructor(address _rateAggregator) {
+       s_rateAggregator = IRateAggregator(_rateAggregator);
+    }
+}

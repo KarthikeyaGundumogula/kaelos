@@ -13,6 +13,7 @@ contract RateAggregator {
     error RateAggregatorError_InvalidCollateral();
     error RateAggregatorError_CollateralAlreadyInitialized();
     error RateAggregatorError_StationNotLive();
+    error RateAggregatorError_UnRecognizedOperation();
 
     struct Collateral {
         uint256 stabilityFee;
@@ -22,6 +23,8 @@ contract RateAggregator {
     uint256 public constant PRECISION = 10e27;
     uint256 private constant ADDITIONAL_FEED_PRECISION = 10e10;
     uint256 private constant DECIMAL_PRECISION = 10e18;
+    uint256 public s_perStepDecFactor;
+    uint256 public s_stepSize;
     uint256 public s_baseStabilityFee; //protocol level
     mapping(bytes32 collateralType => Collateral data)
         public s_collateralTokens;
@@ -58,6 +61,18 @@ contract RateAggregator {
         s_baseStabilityFee = _newValue;
     }
 
+    function updateAuctionParams(bytes32 _feild,uint256 _value) external authenticate {
+        if(_feild == "stepSize"){
+            s_stepSize = _value;
+        }
+        else if (_feild == "perStepDecFactor") {
+            s_perStepDecFactor = _value;
+        }
+        else {
+            revert RateAggregatorError_UnRecognizedOperation();
+        }
+    }
+
     function initNewCollateralType(
         bytes32 _collateralId,
         uint256 _stabilityFee
@@ -90,6 +105,10 @@ contract RateAggregator {
             _oldRate
         );
         s_collateralTokens[_collateralId].lastUpdate = block.timestamp;
+    }
+
+    function currentAuctionPrice(uint256 initialPrice, uint256 timeElapsed) external view returns(uint256 price) {
+        price = _rmul(initialPrice, _rpow(s_perStepDecFactor, timeElapsed/s_stepSize, PRECISION));
     }
 
     // --- Math ---
