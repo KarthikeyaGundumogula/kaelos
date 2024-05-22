@@ -45,7 +45,8 @@ contract HeadStation {
     using PriceFeedLib for AggregatorV3Interface;
     IRateAggregator private rateAggregator;
     uint256 private constant THRESHOLD_PRECISION = 100;
-    uint256 public s_totalKSCIssued;
+    uint256 public s_totalKSCDebt;
+    uint256 public s_unBackedKSC;
     uint256 public TotalDebtCeiling;
     mapping(bytes32 collateralId => CollateralType collateral)
         private s_collaterals;
@@ -142,7 +143,7 @@ contract HeadStation {
             revert HeadStationError_UnRecognozedCollateralType();
         }
         _updateRate(_collateralId);
-        s_totalKSCIssued = _sub(s_totalKSCIssued, _amount);
+        s_totalKSCDebt = _sub(s_totalKSCDebt, _amount);
         uint256 rate = s_collaterals[_collateralId].stabilityRate;
         uint256 normalizedAmount = _amount / rate;
         s_reserves[_collateralId][_user]._totalKSCMinted = _sub(
@@ -165,7 +166,7 @@ contract HeadStation {
             revert HeadStationError_UnRecognozedCollateralType();
         }
         _updateRate(_collateralId);
-        s_totalKSCIssued = _sub(s_totalKSCIssued, _amount);
+        s_totalKSCDebt = _sub(s_totalKSCDebt, _amount);
         uint256 rate = s_collaterals[_collateralId].stabilityRate;
         uint256 normalizedAmount = _amount / rate;
         s_reserves[_collateralId][_user]._totalKSCMinted = _add(
@@ -197,6 +198,7 @@ contract HeadStation {
         Reserve storage res = s_reserves[_collateralId][_reserveOwner];
         res._totalCollateral = _sub(res._totalCollateral, _collateral);
         res._totalKSCMinted = _sub(res._totalKSCMinted, _debtKSC);
+        s_unBackedKSC = _add(s_unBackedKSC, _debtKSC);
     }
 
     function addKeeperIncentives(
@@ -211,6 +213,8 @@ contract HeadStation {
             s_reserves[_collateralId][_keeper]._totalKSCMinted,
             normalizedAmount
         );
+        s_totalKSCDebt = _add(s_totalKSCDebt, _amount);
+        s_unBackedKSC = _add(s_unBackedKSC, _amount);
     }
 
     //external view functions
@@ -239,6 +243,7 @@ contract HeadStation {
             revert HeadStationError_UnAuthorizedOperation();
         }
     }
+
     function _updateRate(bytes32 _collateralId) internal {
         uint256 oldRate = s_collaterals[_collateralId].stabilityRate;
         uint256 newRate = rateAggregator.calculateStabilityRate(
@@ -250,7 +255,7 @@ contract HeadStation {
             s_collaterals[_collateralId].totalDebtOnThisCollateral,
             _sub(newRate, oldRate)
         );
-        s_totalKSCIssued = _add(s_totalKSCIssued, totalDebtChange);
+        s_totalKSCDebt = _add(s_totalKSCDebt, totalDebtChange);
     }
 
     function _calculateSafetyIndex(

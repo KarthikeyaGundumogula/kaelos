@@ -13,10 +13,12 @@ interface IHeadStation {
         bytes32 id,
         address user
     ) external view returns (uint256 collateral, uint256 debt);
+
     function getSafetyIndexOfReserve(
         bytes32 _collateralId,
         address _user
     ) external returns (uint256 safetyIndex, uint256 stabilityRate);
+
     function confiscateReserve(
         bytes32 _collateralId,
         address _reserveOwner,
@@ -27,6 +29,7 @@ interface IHeadStation {
 
 interface IAuctionHouse {
     function startAuction(
+        bytes32 _collateralId,
         uint256 _collateralAmount,
         uint256 _debtAmount,
         address _reserveOwner,
@@ -157,7 +160,13 @@ contract LiquidationStation {
             int(collateral),
             int(debt)
         );
-        s_auctionHouse.startAuction(collateral, debt, _user, msg.sender);
+        s_auctionHouse.startAuction(
+            _collateralId,
+            collateral,
+            debt,
+            _user,
+            msg.sender
+        );
     }
 
     //--external view functions--//
