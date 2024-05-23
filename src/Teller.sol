@@ -7,7 +7,7 @@
  */
 pragma solidity ^0.8.20;
 
-interface Collateral {
+interface ICollateral {
     function decimals() external view returns (uint);
 
     function transfer(address, uint) external returns (bool);
@@ -15,7 +15,7 @@ interface Collateral {
     function transferFrom(address, address, uint) external returns (bool);
 }
 
-interface KelCoin {
+interface IKelCoin {
     function mint(address, uint) external;
 
     function burn(address, uint) external;
@@ -55,7 +55,7 @@ contract KelCoinTeller {
     error KelTellerStationError_PausedWithdrawls();
 
     uint256 private constant HEADSTATIONPRESICION = 10 ** 27;
-    KelCoin public s_kelCoin;
+    IKelCoin public s_kelCoin;
     HeadStation public s_headStation;
     bool public s_status;
     mapping(address user => bool authorized) private s_authorizedAddresses;
@@ -68,7 +68,7 @@ contract KelCoinTeller {
     event StausUpdated(bool status);
 
     constructor(address _kelCoin, address _headStation) {
-        s_kelCoin = KelCoin(_kelCoin);
+        s_kelCoin = IKelCoin(_kelCoin);
         s_headStation = HeadStation(_headStation);
         s_authorizedAddresses[msg.sender] = true;
         emit AuthorizedAddressAdded(msg.sender);
@@ -136,7 +136,7 @@ contract CollateralTeller {
     error CollateralTellerError_AmountOverFlown();
 
     uint256 private constant HEADSTATIONPRECISION = 10 ** 27;
-    Collateral public collateralToken;
+    ICollateral public collateralToken;
     bytes32 private s_collateralType;
     HeadStation public s_headStation;
     uint256 private s_collateralDecimals;
@@ -159,7 +159,7 @@ contract CollateralTeller {
         s_status = true;
         s_headStation = HeadStation(_headStation);
         s_collateralType = _collateralType;
-        collateralToken = Collateral(_collateralAddress);
+        collateralToken = ICollateral(_collateralAddress);
         s_collateralDecimals = collateralToken.decimals();
         emit AuthorizedAddressAdded(msg.sender);
     }

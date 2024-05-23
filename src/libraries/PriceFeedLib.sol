@@ -17,6 +17,7 @@ library PriceFeedLib {
 
     uint256 private constant TIMEOUT = 3 hours;
     uint256 private constant DECIMAL_PRECISION = 10e18;
+    uint256 private constant ADDITIONAL_PRECISION = 10e10;
 
     function staleCheckLatestRoundData(
         AggregatorV3Interface chainlinkFeed
@@ -52,8 +53,11 @@ library PriceFeedLib {
         (, int256 currentPrice, , , ) = staleCheckLatestRoundData(
             _chainlinkPriceFeed
         );
-        value = (uint(currentPrice) * _amount) / DECIMAL_PRECISION;
+        value =
+            (uint(currentPrice) * _amount * ADDITIONAL_PRECISION) /
+            DECIMAL_PRECISION;
     }
+
     function getTokenAmountForUSD(
         AggregatorV3Interface _chainlinkPriceFeed,
         uint _amount
@@ -61,6 +65,8 @@ library PriceFeedLib {
         (, int256 currentPrice, , , ) = staleCheckLatestRoundData(
             _chainlinkPriceFeed
         );
-        value = (_amount * DECIMAL_PRECISION) / uint(currentPrice);
+        value =
+            (_amount * DECIMAL_PRECISION) /
+            (uint(currentPrice) * ADDITIONAL_PRECISION);
     }
 }
