@@ -1,5 +1,4 @@
-//SPDX-License-Identifier
-
+//SPDX-License-Identifier: MIT
 /**
  * @title Assets
  * @author Karthikeya
@@ -32,7 +31,7 @@ contract Assets is ERC1155URIStorage {
         string memory URI
     ) external authenticate {
         _mint(account, id, amount, "");
-        _setURI(id,URI);
+        _setURI(id, URI);
     }
 
     function mintBatch(
