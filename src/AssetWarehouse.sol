@@ -22,6 +22,14 @@ interface IAssets {
         uint256[] memory _amounts
     ) external;
 
+    function burn(address _account, uint256 _id, uint256 _amount) external;
+
+    function burnBatch(
+        address _fromAccount,
+        uint256[] memory _ids,
+        uint256[] memory _amounts
+    ) external;
+
     function safeTransferFrom(
         address _src,
         address _dst,
@@ -30,6 +38,4 @@ interface IAssets {
     ) external;
 }
 
-contract AssetWarehouse {
-  
-}
+contract AssetWarehouse {}
