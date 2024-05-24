@@ -11,15 +11,15 @@ pragma solidity ^0.8.20;
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract KelStableCoin is ERC20 {
-    error KelError_UnAuthorizedMinter();
+    error KelCoinError_UnAuthorizedAddress();
 
-    constructor() ERC20("Kel StableCoin", "KEL") {}
+    constructor() ERC20("KelStableCoin", "KEL") {}
 
     mapping(address => bool) private s_authorizedAddresses;
 
     modifier authenticate() {
         if (s_authorizedAddresses[msg.sender] == false) {
-            revert KelError_UnAuthorizedMinter();
+            revert KelCoinError_UnAuthorizedAddress();
         }
         _;
     }
@@ -60,5 +60,9 @@ contract KelStableCoin is ERC20 {
         uint256 amount
     ) public override returns (bool) {
         return super.approve(spender, amount);
+    }
+
+    function getBalance(address _spender) external view returns(uint256 balance) {
+        balance = balanceOf(_spender);
     }
 }
