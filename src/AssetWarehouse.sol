@@ -8,86 +8,42 @@
 
 pragma solidity ^0.8.20;
 
-interface IAssets {
-    function mint(
-        address account,
-        uint256 id,
-        uint256 amount,
-        string memory URI
-    ) external;
+import {ERC1155Holder} from "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
+import {IAssets, IKelStableCoin, IGameStation} from "./interfaces/IAssetWareHouse.sol";
 
-    function mintBatch(
-        address _receiver,
-        uint256[] memory _ids,
-        uint256[] memory _amounts
-    ) external;
-
-    function burn(address _account, uint256 _id, uint256 _amount) external;
-
-    function burnBatch(
-        address _fromAccount,
-        uint256[] memory _ids,
-        uint256[] memory _amounts
-    ) external;
-
-    function safeTransferFrom(
-        address _src,
-        address _dst,
-        uint256 _id,
-        uint256 _amount
-    ) external;
-
-    function getBalnce(
-        address _user,
-        uint256 _assetId
-    ) external view returns (uint256 balance);
-}
-
-interface IKelStableCoin {
-    function getBalance(
-        address _spender
-    ) external view returns (uint256 balance);
-
-    function sendTokens(
-        address _sender,
-        address _receiver,
-        uint256 _amout
-    ) external returns (bool success);
-}
-
-interface IGameStation {
-    function updateGameOwner(uint256 _gameId, address _newOwner) external;
-
-    function mintAssets(
-        uint256 _gameId,
-        uint256 _assetId,
-        uint256 _amount,
-        uint256 _price
-    ) external;
-
-    function transferAssets(
-        uint256 _gameId,
-        uint256 _assetId,
-        uint256 _amount,
-        address _palyer
-    ) external;
-
-    function depositKSC(uint256 _gameId, uint _amount) external;
-}
-
-contract AssetWarehouse {
+contract AssetWarehouse is ERC1155Holder {
     error AssetWarehouseError_OnlyGameOwner();
+    error AssetWarehouseError_InvalidGameAssetId();
+    error AssetWarehouseError_InsufficientAssetSuply();
+
+    struct AssetNFT {
+        uint256 totalSupply;
+        uint256 gameId;
+    }
+
+    enum PlayerStatus {
+        JOINED,
+        SUSPENDED
+    }
+
+    struct Game {
+        address owner;
+        uint256 gamePassId;
+        uint256 gamePassCost;
+    }
 
     uint256 public s_NftIds;
     IAssets private s_assets;
     IKelStableCoin private s_kelStableCoin;
     IGameStation private s_gameStation;
 
-    mapping(uint256 _gameId => address _owner) private s_gameIdToOwner;
-    mapping(uint256 _gameId => uint _gamePassId) private s_gameIdToPassId;
+    mapping(uint256 gameId => Game game) private s_games;
+    mapping(uint256 assetId => AssetNFT asset) private s_assetNFTs;
+    mapping(address player => mapping(uint256 gameId => PlayerStatus status))
+        private s_playerGameStatus;
 
     modifier onlyGameOwner(uint256 _gameId) {
-        if (s_gameIdToOwner[_gameId] != msg.sender) {
+        if (s_games[_gameId].owner != msg.sender) {
             revert AssetWarehouseError_OnlyGameOwner();
         }
         _;
@@ -99,11 +55,24 @@ contract AssetWarehouse {
         s_kelStableCoin = IKelStableCoin(_kelCoin);
     }
 
-    function createGame(string memory Uri) external {
+    function createGame(string memory Uri, uint256 _price) external {
         uint256 id = ++s_NftIds;
         s_assets.mint(msg.sender, id, 1, Uri);
-        s_gameIdToOwner[id] = msg.sender;
+        s_games[id].owner = msg.sender;
+        uint gamePass = ++s_NftIds;
+        s_games[id].gamePassCost = _price;
+        s_games[id].gamePassId = gamePass;
         s_gameStation.updateGameOwner(id, msg.sender);
+    }
+
+    function buyGamePass(uint256 _gameId) external {
+        s_kelStableCoin.sendTokens(
+            msg.sender,
+            address(this),
+            s_games[_gameId].gamePassCost
+        );
+        s_gameStation.depositKSC(_gameId, s_games[_gameId].gamePassCost);
+        s_playerGameStatus[msg.sender][_gameId] = PlayerStatus.JOINED;
     }
 
     function depositKelCoin(
@@ -112,6 +81,14 @@ contract AssetWarehouse {
     ) external onlyGameOwner(_gameId) {
         s_kelStableCoin.sendTokens(msg.sender, address(this), _amount);
         s_gameStation.depositKSC(_gameId, _amount);
+    }
+
+    function withdrawKelCoin(
+        uint256 _gameId,
+        uint256 _amount
+    ) external onlyGameOwner(_gameId) {
+        s_gameStation.withdrawKSC(_gameId, _amount);
+        s_kelStableCoin.sendTokens(address(this), msg.sender, _amount);
     }
 
     function mintNewAssets(
@@ -123,6 +100,20 @@ contract AssetWarehouse {
         uint256 id = ++s_NftIds;
         s_assets.mint(msg.sender, id, _amount, Uri);
         s_gameStation.mintAssets(_gameId, id, _amount, _price);
+        s_assetNFTs[id].gameId = _gameId;
+        s_assetNFTs[id].totalSupply = _amount;
+    }
+
+    function mintExistingAssets(
+        uint256 _gameId,
+        uint256 _assetId,
+        uint256 _amount
+    ) external onlyGameOwner(_gameId) {
+        if (s_assetNFTs[_assetId].gameId != _gameId) {
+            revert AssetWarehouseError_InvalidGameAssetId();
+        }
+        s_assets.mint(msg.sender, _assetId, _amount, "");
+        s_gameStation.mintExistingAssets(_gameId, _assetId, _amount);
     }
 
     function transferAssets(
@@ -131,9 +122,23 @@ contract AssetWarehouse {
         uint256 _assetId,
         uint256 _amount
     ) external onlyGameOwner(_gameId) {
-        s_assets.safeTransferFrom(msg.sender, _receiver, _assetId, _amount);
+        if (s_assetNFTs[_assetId].totalSupply < _amount) {
+            revert AssetWarehouseError_InsufficientAssetSuply();
+        }
+        s_assets.safeTransferFrom(address(this), _receiver, _assetId, _amount);
         s_gameStation.transferAssets(_gameId, _assetId, _amount, _receiver);
     }
 
-    function burnAssets(uint256 _gameId) external onlyGameOwner(_gameId) {}
+    function burnAssets(
+        uint256 _gameId,
+        uint256 _assetId,
+        uint256 _amount
+    ) external onlyGameOwner(_gameId) {
+        s_assets.burn(msg.sender, _assetId, _amount);
+        s_gameStation.burnAssets(_gameId, _assetId, _amount);
+    }
+
+    function liquidatePLayer(
+        uint256 _gameId
+    ) external {}
 }

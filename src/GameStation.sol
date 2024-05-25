@@ -73,8 +73,26 @@ contract GameStation {
         s_gameTreasuries[_gameId].owner = _newOwner;
     }
 
-    function depositKSC(uint256 _gameId, uint _amount) external authenticate {
+    function depositKSC(
+        uint256 _gameId,
+        uint256 _amount
+    ) external authenticate {
         s_gameTreasuries[_gameId].totalKSCBalance += _amount;
+    }
+
+    function withdrawKSC(
+        uint256 _gameId,
+        uint256 _amount
+    ) external authenticate {
+        s_gameTreasuries[_gameId].totalKSCBalance += _amount;
+        _revertIfSafetyIndexBroken(_gameId);
+    }
+
+    function liquidatePlayer(
+        address _player,
+        uint256 _gameId
+    ) external returns (uint256 liquidationAmount) {
+        s_userAssets = 
     }
 
     function mintAssets(
@@ -84,7 +102,7 @@ contract GameStation {
         uint256 _price
     ) external authenticate {
         GameTreasury storage game = s_gameTreasuries[_gameId];
-        if(game.owner == address(0)) {
+        if (game.owner == address(0)) {
             revert GameStationError_ZeroAddressGameOwner();
         }
         game.assetIds.push(_assetId);
@@ -96,6 +114,22 @@ contract GameStation {
         _revertIfSafetyIndexBroken(_gameId);
     }
 
+    function mintExistingAssets(
+        uint256 _gameId,
+        uint256 _assetId,
+        uint256 _amount
+    ) external {
+        address owner = s_gameTreasuries[_gameId].owner;
+        if (owner == address(0)) {
+            revert GameStationError_ZeroAddressGameOwner();
+        }
+        s_userAssets[owner][_assetId] += _amount;
+        s_gameTreasuries[_gameId].issuedAssetsValue +=
+            _amount *
+            s_assets[_assetId].price;
+        _revertIfSafetyIndexBroken(_gameId);
+    }
+
     function transferAssets(
         uint256 _gameId,
         uint256 _assetId,
@@ -103,24 +137,29 @@ contract GameStation {
         address _palyer
     ) external authenticate {
         GameTreasury storage game = s_gameTreasuries[_gameId];
-        if(game.owner == address(0)) {
+        if (game.owner == address(0)) {
             revert GameStationError_ZeroAddressGameOwner();
         }
-        if(s_userAssets[game.owner][_assetId] == 0) {
+        if (s_userAssets[game.owner][_assetId] == 0) {
             revert GameStationError_AssetNotFound();
         }
-        if(s_userAssets[game.owner][_assetId]<_amount || _amount < 0) {
+        if (s_userAssets[game.owner][_assetId] < _amount || _amount < 0) {
             revert GameStationError_InvalidAssetAmount();
         }
-        if(s_userAssets[_palyer][_assetId]==0){
+        if (s_userAssets[_palyer][_assetId] == 0) {
             s_gamePlayerAssetIds[_gameId][_palyer].push(_assetId);
         }
         s_userAssets[_palyer][_assetId] += _amount;
         s_userAssets[game.owner][_assetId] -= _amount;
     }
 
-    function burnAssets(uint256 _gameId, uint256 _assetId, uint256 _amount) external {
+    function burnAssets(
+        uint256 _gameId,
+        uint256 _assetId,
+        uint256 _amount
+    ) external {
         uint256 burningAssetValue = s_assets[_assetId].price * _amount;
+        s_gameTreasuries[_gameId].issuedAssetsValue -= burningAssetValue;
     }
 
     //--Internal Helper Fucntions--//
