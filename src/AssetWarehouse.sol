@@ -16,14 +16,14 @@ contract AssetWarehouse is ERC1155Holder {
     error AssetWarehouseError_InvalidGameAssetId();
     error AssetWarehouseError_InsufficientAssetSuply();
 
-    struct AssetNFT {
-        uint256 totalSupply;
-        uint256 gameId;
-    }
-
     enum PlayerStatus {
         JOINED,
         SUSPENDED
+    }
+
+    struct AssetNFT {
+        uint256 totalSupply;
+        uint256 gameId;
     }
 
     struct Game {
@@ -41,6 +41,8 @@ contract AssetWarehouse is ERC1155Holder {
     mapping(uint256 assetId => AssetNFT asset) private s_assetNFTs;
     mapping(address player => mapping(uint256 gameId => PlayerStatus status))
         private s_playerGameStatus;
+    mapping(address player => mapping(uint256 assetId => uint256 amount))
+        private s_playerAssetHoldings;
 
     modifier onlyGameOwner(uint256 _gameId) {
         if (s_games[_gameId].owner != msg.sender) {
@@ -127,6 +129,7 @@ contract AssetWarehouse is ERC1155Holder {
         }
         s_assets.safeTransferFrom(address(this), _receiver, _assetId, _amount);
         s_gameStation.transferAssets(_gameId, _assetId, _amount, _receiver);
+        s_playerAssetHoldings[_receiver][_assetId] += _amount; 
     }
 
     function burnAssets(
@@ -138,7 +141,17 @@ contract AssetWarehouse is ERC1155Holder {
         s_gameStation.burnAssets(_gameId, _assetId, _amount);
     }
 
-    function liquidatePLayer(
-        uint256 _gameId
-    ) external {}
+    function liquidatePLayer(uint256 _gameId) external {
+        (uint256 liquidationAmount, uint256[] memory assetIds) = s_gameStation
+            .liquidatePlayer(msg.sender, _gameId);
+        uint256 length = assetIds.length - 1;
+        uint256[] memory playerAssetHoldings = new uint256[](length);
+        for (uint i = 0; i < length; i++) {
+            playerAssetHoldings[i] = (
+                s_playerAssetHoldings[msg.sender][assetIds[i]]
+            );
+        }
+        s_assets.burnBatch(msg.sender,assetIds,playerAssetHoldings);
+        s_kelStableCoin.sendTokens(address(this),msg.sender,liquidationAmount);
+    }
 }

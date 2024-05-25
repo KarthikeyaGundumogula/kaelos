@@ -91,8 +91,17 @@ contract GameStation {
     function liquidatePlayer(
         address _player,
         uint256 _gameId
-    ) external returns (uint256 liquidationAmount) {
-        s_userAssets = 
+    ) external authenticate returns(uint256 liquidationAmount,uint256[] memory assetIds) {
+        uint256 assetsValue;
+        uint256[] memory gameAssetIds = s_gameTreasuries[_gameId].assetIds;
+        for (uint256 i = 0; i < gameAssetIds.length - 1; i++) {
+            uint256 assetHolding = s_userAssets[_player][gameAssetIds[i]];
+            uint256 price = s_assets[i].price;
+            assetsValue += (assetHolding * price) / s_liquidationThreshold;
+            s_userAssets[_player][gameAssetIds[i]] = 0;
+        }
+        liquidationAmount = assetsValue / s_liquidationThreshold;
+        assetIds = gameAssetIds;
     }
 
     function mintAssets(
@@ -162,12 +171,34 @@ contract GameStation {
         s_gameTreasuries[_gameId].issuedAssetsValue -= burningAssetValue;
     }
 
+    //--external view functions--//
+    function getPlayerGameAssetValue(
+        address _player,
+        uint256 _gameId
+    ) external view returns (uint256 value) {
+        value = _calculateGamePLayerAssetValue(_player, _gameId);
+    }
+
     //--Internal Helper Fucntions--//
     function _revertIfSafetyIndexBroken(uint256 _gameId) internal view {
         uint256 safetyIndex = _calculateSafetyIndex(_gameId);
         if (safetyIndex < 1) {
             revert GameStationError_SafetyIndexBroken();
         }
+    }
+
+    function _calculateGamePLayerAssetValue(
+        address _player,
+        uint256 _gameId
+    ) internal view returns (uint256 value) {
+        uint256 assetsValue;
+        uint256[] memory gameAssetIds = s_gameTreasuries[_gameId].assetIds;
+        for (uint256 i = 0; i < gameAssetIds.length - 1; i++) {
+            uint256 assetHolding = s_userAssets[_player][gameAssetIds[i]];
+            uint256 price = s_assets[i].price;
+            assetsValue += (assetHolding * price) / s_liquidationThreshold;
+        }
+        value = assetsValue/s_liquidationThreshold;
     }
 
     function _calculateSafetyIndex(

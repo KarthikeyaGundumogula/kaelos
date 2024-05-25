@@ -80,4 +80,9 @@ interface IGameStation {
         uint256 _assetId,
         uint256 _amount
     ) external;
+
+    function liquidatePlayer(
+        address _player,
+        uint256 _gameId
+    ) external returns (uint256 liquidationAmount, uint256[] memory assetIds);
 }
