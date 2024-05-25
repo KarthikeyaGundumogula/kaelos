@@ -65,4 +65,8 @@ contract KelStableCoin is ERC20 {
     function getBalance(address _spender) external view returns(uint256 balance) {
         balance = balanceOf(_spender);
     }
+
+    function sendTokens(address _sender, address _receiver , uint256 _amout) external returns(bool success) {
+        success = transferFrom(_sender, _receiver, _amout);
+    }
 }

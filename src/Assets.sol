@@ -66,4 +66,11 @@ contract Assets is ERC1155URIStorage {
     ) external {
         _safeTransferFrom(_src, _dst, _id, _amount, "");
     }
+
+    function getBalnce(
+        address _user,
+        uint256 _assetId
+    ) external view returns (uint256 balance) {
+        balance = balanceOf(_user, _assetId);
+    }
 }

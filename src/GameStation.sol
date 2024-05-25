@@ -10,6 +10,9 @@ pragma solidity ^0.8.20;
 
 contract GameStation {
     error GameStationError_UnAuthorizedAddress();
+    error GameStationError_InvalidAssetAmount();
+    error GameStationError_AssetNotFound();
+    error GameStationError_ZeroAddressGameOwner();
     error GameStationError_SafetyIndexBroken();
 
     struct GameTreasury {
@@ -22,22 +25,22 @@ contract GameStation {
         uint256 price;
         uint256 gameId;
     }
-    struct GamePlayer {
-        uint256[] assetIds;
-    }
-
     uint256 private s_liquidationThreshold;
     mapping(address user => bool access) private s_authorizedAddresses;
     mapping(uint256 gameId => GameTreasury treasury) private s_gameTreasuries;
-    mapping(uint256 gameId => mapping(address user => GamePlayer player))
-        private s_gamePlayers;
+    mapping(uint256 gameId => mapping(address user => uint256[] assetIds))
+        private s_gamePlayerAssetIds;
     mapping(uint256 assetId => Asset asset) private s_assets;
-    mapping(address user => mapping(uint256 assetId => uint256 amount))
+    mapping(address user => mapping(uint256 assetId => uint256 holdingAmount))
         private s_userAssets;
 
     //--Events--//
     event authorizedAddressAdded(address user);
     event authorizedAddressRemoved(address user);
+
+    constructor() {
+        s_authorizedAddresses[msg.sender] = true;
+    }
 
     //--Authorization and Adminstration--//
     modifier authenticate() {
@@ -78,27 +81,46 @@ contract GameStation {
         uint256 _gameId,
         uint256 _assetId,
         uint256 _amount,
-        address _player
+        uint256 _price
     ) external authenticate {
         GameTreasury storage game = s_gameTreasuries[_gameId];
+        if(game.owner == address(0)) {
+            revert GameStationError_ZeroAddressGameOwner();
+        }
         game.assetIds.push(_assetId);
         uint256 assetValue = _amount * s_assets[_assetId].price;
         game.issuedAssetsValue += assetValue;
-        if (s_userAssets[_player][_assetId] == 0) {
-            s_gamePlayers[_gameId][_player].assetIds.push(_assetId);
-        }
-        s_userAssets[_player][_assetId] += assetValue;
+        s_assets[_assetId].price = _price;
+        s_assets[_assetId].gameId = _gameId;
+        s_userAssets[game.owner][_assetId] += _amount;
         _revertIfSafetyIndexBroken(_gameId);
     }
 
-    function burnAssets(
+    function transferAssets(
         uint256 _gameId,
         uint256 _assetId,
         uint256 _amount,
-        uint256 _holder
+        address _palyer
     ) external authenticate {
-      GameTreasury storage game = s_gameTreasuries[_gameId];
-      
+        GameTreasury storage game = s_gameTreasuries[_gameId];
+        if(game.owner == address(0)) {
+            revert GameStationError_ZeroAddressGameOwner();
+        }
+        if(s_userAssets[game.owner][_assetId] == 0) {
+            revert GameStationError_AssetNotFound();
+        }
+        if(s_userAssets[game.owner][_assetId]<_amount || _amount < 0) {
+            revert GameStationError_InvalidAssetAmount();
+        }
+        if(s_userAssets[_palyer][_assetId]==0){
+            s_gamePlayerAssetIds[_gameId][_palyer].push(_assetId);
+        }
+        s_userAssets[_palyer][_assetId] += _amount;
+        s_userAssets[game.owner][_assetId] -= _amount;
+    }
+
+    function burnAssets(uint256 _gameId, uint256 _assetId, uint256 _amount) external {
+        uint256 burningAssetValue = s_assets[_assetId].price * _amount;
     }
 
     //--Internal Helper Fucntions--//
