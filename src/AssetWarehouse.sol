@@ -15,6 +15,7 @@ contract AssetWarehouse is ERC1155Holder {
     error AssetWarehouseError_OnlyGameOwner();
     error AssetWarehouseError_InvalidGameAssetId();
     error AssetWarehouseError_InsufficientAssetSuply();
+    error AssetWarehouseError_PLayerNotSuspended();
 
     enum PlayerStatus {
         JOINED,
@@ -129,7 +130,7 @@ contract AssetWarehouse is ERC1155Holder {
         }
         s_assets.safeTransferFrom(address(this), _receiver, _assetId, _amount);
         s_gameStation.transferAssets(_gameId, _assetId, _amount, _receiver);
-        s_playerAssetHoldings[_receiver][_assetId] += _amount; 
+        s_playerAssetHoldings[_receiver][_assetId] += _amount;
     }
 
     function burnAssets(
@@ -141,7 +142,17 @@ contract AssetWarehouse is ERC1155Holder {
         s_gameStation.burnAssets(_gameId, _assetId, _amount);
     }
 
+    function suspendPlayer(
+        uint256 _gameId,
+        address _player
+    ) external onlyGameOwner(_gameId) {
+        s_playerGameStatus[_player][_gameId] = PlayerStatus.SUSPENDED;
+    }
+
     function liquidatePLayer(uint256 _gameId) external {
+        if(s_playerGameStatus[msg.sender][_gameId] != PlayerStatus.SUSPENDED){
+            revert AssetWarehouseError_PLayerNotSuspended();
+        }
         (uint256 liquidationAmount, uint256[] memory assetIds) = s_gameStation
             .liquidatePlayer(msg.sender, _gameId);
         uint256 length = assetIds.length - 1;
@@ -151,7 +162,17 @@ contract AssetWarehouse is ERC1155Holder {
                 s_playerAssetHoldings[msg.sender][assetIds[i]]
             );
         }
-        s_assets.burnBatch(msg.sender,assetIds,playerAssetHoldings);
-        s_kelStableCoin.sendTokens(address(this),msg.sender,liquidationAmount);
+        s_assets.burnBatch(msg.sender, assetIds, playerAssetHoldings);
+        s_assets.burn(msg.sender, s_games[_gameId].gamePassId, 1);
+        s_kelStableCoin.sendTokens(
+            address(this),
+            msg.sender,
+            liquidationAmount
+        );
+        s_playerGameStatus[msg.sender][_gameId] = PlayerStatus.SUSPENDED;
+    }
+
+    function getPlayerStatus(address _player,uint256 _gameId) external view returns(PlayerStatus status){
+        status = s_playerGameStatus[_player][_gameId];
     }
 }

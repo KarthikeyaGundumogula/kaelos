@@ -30,10 +30,6 @@ interface IAssets {
         uint256 _amount
     ) external;
 
-    function getBalnce(
-        address _user,
-        uint256 _assetId
-    ) external view returns (uint256 balance);
 }
 
 interface IKelStableCoin {
