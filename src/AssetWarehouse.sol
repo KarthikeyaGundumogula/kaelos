@@ -13,6 +13,8 @@ import {IAssets, IKelStableCoin, IGameStation} from "./interfaces/IAssetWareHous
 
 contract AssetWarehouse is ERC1155Holder {
     error AssetWarehouseError_OnlyGameOwner();
+    error AssetWarehouseError_AssetIsNotTransferrable();
+    error AssetWarehouseError_InsufficientAssetBalance();
     error AssetWarehouseError_InvalidGameAssetId();
     error AssetWarehouseError_InsufficientAssetSuply();
     error AssetWarehouseError_PLayerNotSuspended();
@@ -24,6 +26,8 @@ contract AssetWarehouse is ERC1155Holder {
 
     struct AssetNFT {
         uint256 totalSupply;
+        uint256 currentSupply;
+        bool transferrable;
         uint256 gameId;
     }
 
@@ -98,6 +102,7 @@ contract AssetWarehouse is ERC1155Holder {
         uint256 _gameId,
         uint256 _amount,
         uint256 _price,
+        bool _isTransferrable,
         string memory Uri
     ) external onlyGameOwner(_gameId) {
         uint256 id = ++s_NftIds;
@@ -105,6 +110,8 @@ contract AssetWarehouse is ERC1155Holder {
         s_gameStation.mintAssets(_gameId, id, _amount, _price);
         s_assetNFTs[id].gameId = _gameId;
         s_assetNFTs[id].totalSupply = _amount;
+        s_assetNFTs[id].currentSupply = _amount;
+        s_assetNFTs[id].transferrable = _isTransferrable;
     }
 
     function mintExistingAssets(
@@ -115,22 +122,37 @@ contract AssetWarehouse is ERC1155Holder {
         if (s_assetNFTs[_assetId].gameId != _gameId) {
             revert AssetWarehouseError_InvalidGameAssetId();
         }
-        s_assets.mint(msg.sender, _assetId, _amount, "");
+        s_assets.mint((address(this)), _assetId, _amount, "");
         s_gameStation.mintExistingAssets(_gameId, _assetId, _amount);
+        s_assetNFTs[_assetId].totalSupply += _amount;
+        s_assetNFTs[_assetId].currentSupply += _amount;
     }
 
-    function transferAssets(
+    function issueAssets(
         uint256 _gameId,
         address _receiver,
         uint256 _assetId,
         uint256 _amount
     ) external onlyGameOwner(_gameId) {
-        if (s_assetNFTs[_assetId].totalSupply < _amount) {
+        if (s_assetNFTs[_assetId].currentSupply < _amount) {
             revert AssetWarehouseError_InsufficientAssetSuply();
         }
         s_assets.safeTransferFrom(address(this), _receiver, _assetId, _amount);
-        s_gameStation.transferAssets(_gameId, _assetId, _amount, _receiver);
+        s_gameStation.transferAssets(_gameId, _assetId, _amount,s_games[_gameId].owner, _receiver);
         s_playerAssetHoldings[_receiver][_assetId] += _amount;
+        s_assetNFTs[_assetId].currentSupply -= _amount;
+    }
+
+    function transferAssets(uint256 _gameId,address _receiver,uint256 _assetId,uint256 _amount) external {
+        if(s_playerAssetHoldings[msg.sender][_gameId] <_amount){
+            revert AssetWarehouseError_InsufficientAssetBalance();
+        }
+        if(s_assetNFTs[_assetId].transferrable != true) {
+            revert AssetWarehouseError_AssetIsNotTransferrable();
+        }
+        s_assets.safeTransferFrom(address(this), _receiver, _assetId, _amount);
+        s_gameStation.transferAssets(_gameId, _assetId, _amount,msg.sender, _receiver);
+        s_playerAssetHoldings[_receiver][_assetId] += _amount;        
     }
 
     function burnAssets(
@@ -138,8 +160,10 @@ contract AssetWarehouse is ERC1155Holder {
         uint256 _assetId,
         uint256 _amount
     ) external onlyGameOwner(_gameId) {
-        s_assets.burn(msg.sender, _assetId, _amount);
+        s_assets.burn(address(this), _assetId, _amount);
         s_gameStation.burnAssets(_gameId, _assetId, _amount);
+        s_assetNFTs[_assetId].totalSupply -= _amount;
+        s_assetNFTs[_assetId].currentSupply -= _amount;
     }
 
     function suspendPlayer(

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.19;
+pragma solidity ^0.8.20;
 
 import {IRouterClient} from "@chainlink/contracts-ccip/src/v0.8/ccip/interfaces/IRouterClient.sol";
 import {OwnerIsCreator} from "@chainlink/contracts-ccip/src/v0.8/shared/access/OwnerIsCreator.sol";
@@ -16,8 +16,6 @@ import {LinkTokenInterface} from "@chainlink/contracts/src/v0.8/shared/interface
 contract Sender is OwnerIsCreator {
     // Custom errors to provide more descriptive revert messages.
     error NotEnoughBalance(uint256 currentBalance, uint256 calculatedFees); // Used to make sure contract has enough balance.
-
-    // Event emitted when a message is sent to another chain.
     event MessageSent(
         bytes32 indexed messageId, // The unique ID of the CCIP message.
         uint64 indexed destinationChainSelector, // The chain selector of the destination chain.
@@ -45,7 +43,7 @@ contract Sender is OwnerIsCreator {
     /// @param receiver The address of the recipient on the destination blockchain.
     /// @param text The string text to be sent.
     /// @return messageId The ID of the message that was sent.
-    function sendMessage(
+    function _sendMessage(
         uint64 destinationChainSelector,
         address receiver,
         string calldata text
@@ -87,8 +85,6 @@ contract Sender is OwnerIsCreator {
             address(s_linkToken),
             fees
         );
-
-        // Return the message ID
         return messageId;
     }
 }

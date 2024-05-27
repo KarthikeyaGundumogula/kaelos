@@ -30,6 +30,11 @@ interface IAssets {
         uint256 _amount
     ) external;
 
+     function getBalnce(
+        address _user,
+        uint256 _assetId
+    ) external view returns(uint256 blance);
+
 }
 
 interface IKelStableCoin {
@@ -54,12 +59,14 @@ interface IGameStation {
         uint256 _price
     ) external;
 
+    
     function transferAssets(
         uint256 _gameId,
         uint256 _assetId,
         uint256 _amount,
-        address _palyer
-    ) external;
+        address _sender,
+        address _receiver
+    ) external ;
 
     function mintExistingAssets(
         uint256 _gameId,
