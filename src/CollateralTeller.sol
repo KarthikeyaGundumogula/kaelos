@@ -9,14 +9,6 @@
  */
 pragma solidity ^0.8.20;
 
-interface ICollateral {
-    function decimals() external view returns (uint);
-
-    function transfer(address, uint) external returns (bool);
-
-    function transferFrom(address, address, uint) external returns (bool);
-}
-
 interface HeadStation {
     function depositCollateral(
         bytes32 _collateralType,
@@ -51,7 +43,6 @@ contract CollateralTeller {
     error CollateralTellerError_AmountOverFlown();
 
     uint256 private constant HEADSTATIONPRECISION = 10 ** 27;
-    ICollateral public collateralToken;
     bytes32 private s_collateralType;
     HeadStation public s_headStation;
     uint256 private s_collateralDecimals;
@@ -67,43 +58,37 @@ contract CollateralTeller {
 
     constructor(
         address _headStation,
-        bytes32 _collateralType,
-        address _collateralAddress
+        bytes32 _collateralType
     ) {
         s_authorizedAddresses[msg.sender] = true;
         s_status = true;
         s_headStation = HeadStation(_headStation);
         s_collateralType = _collateralType;
-        collateralToken = ICollateral(_collateralAddress);
-        s_collateralDecimals = collateralToken.decimals();
         emit AuthorizedAddressAdded(msg.sender);
     }
 
     //--Authorization & Adminstration--//
-    modifier authorize() {
+    modifier authenticate() {
         if (s_authorizedAddresses[msg.sender] != true) {
             revert CollateralTellerError_UnAuthorizedOperation();
         }
         _;
     }
-
-    function addAuthorizedAddress(address user) external authorize {
+    function addAuthorizedAddress(address user) external authenticate {
         s_authorizedAddresses[user] = true;
         emit AuthorizedAddressAdded(user);
     }
-
-    function removeAuthorizedAddresses(address user) external authorize {
+    function removeAuthorizedAddresses(address user) external authenticate {
         s_authorizedAddresses[user] = true;
         emit AuthorizedAddressRemoved(user);
     }
-
-    function changeStatus() external authorize {
+    function changeStatus() external authenticate {
         s_status = !s_status;
         emit StausUpdated(s_status);
     }
 
     //--Deposit & Withdraw Collateral Token--//
-    function depositCollateral(address _user, uint _amount) external {
+    function depositCollateral(address _user, uint _amount) external authenticate{
         if (s_status == false) {
             revert CollateralTellerError_PausedWithDrawls();
         }
@@ -111,14 +96,6 @@ contract CollateralTeller {
             revert CollateralTellerError_AmountLessThanZero();
         }
         s_headStation.depositCollateral(s_collateralType, _amount, _user);
-        bool success = collateralToken.transferFrom(
-            msg.sender,
-            address(this),
-            _amount
-        );
-        if (!success) {
-            revert CollateralTellerError_CollateralTransferFailed();
-        }
         emit CollateralTokenDeposited(_user, _amount);
     }
 
@@ -127,10 +104,6 @@ contract CollateralTeller {
             revert CollateralTellerError_AmountOverFlown();
         }
         s_headStation.withdrawCollateral(s_collateralType, _amount, _user);
-        bool success = collateralToken.transfer(_user, _amount);
-        if (!success) {
-            revert CollateralTellerError_CollateralTransferFailed();
-        }
         emit CollateralTokenWithdrawn(_user, _amount);
     }
 }
