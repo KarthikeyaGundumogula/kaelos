@@ -1,21 +1,31 @@
 // Header.jsx
 import React from "react";
-import { Center, Flex, Heading, Link, Button, HStack } from "@chakra-ui/react";
+import {
+  Center,
+  Flex,
+  Heading,
+  Link,
+  Button,
+  HStack,
+  Box,
+} from "@chakra-ui/react";
 import NextLink from "next/link";
 import Head from "next/head";
 
 const Header = () => {
   return (
-    <Center bg="black" m={5}>
-      <HStack>
-        <Heading color="blue.500" mr={80}>
-          <NextLink href="/" passHref>
-            <Link>Utopian Games</Link>
-          </NextLink>
-        </Heading>
-        <Nav />
-      </HStack>
-    </Center>
+    <Box>
+      <Center bg="black" m={3}>
+        <HStack>
+          <Heading color="blue" mr={80} ml={2}>
+            <NextLink href="/" passHref>
+              <Link>Utopian DAO</Link>
+            </NextLink>
+          </Heading>
+          <Nav />
+        </HStack>
+      </Center>
+    </Box>
   );
 };
 
@@ -32,9 +42,9 @@ const Nav = () => {
           <Link color="blue">Profile</Link>
         </Heading>
       </NextLink>
-      <NextLink href="/settings" passHref>
+      <NextLink href="/reserves" passHref>
         <Heading size={"md"}>
-          <Link color="blue">Settings</Link>
+          <Link color="blue">Vaults</Link>
         </Heading>
       </NextLink>
       <NextLink href="/login" passHref>
