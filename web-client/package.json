@@ -13,6 +13,7 @@
     "@emotion/react": "^11.11.4",
     "@emotion/styled": "^11.11.5",
     "@lens-protocol/react-web": "^2.2.0",
+    "ethers": "^6.12.2",
     "framer-motion": "^11.2.6",
     "next": "14.2.3",
     "react": "^18",

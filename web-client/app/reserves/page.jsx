@@ -11,6 +11,8 @@ import {
   Heading,
 } from "@chakra-ui/react";
 import Header from "@/components/Home/Header";
+import { getCollateralInterFace, getLinkToken } from "@/utils/getContracts";
+import { CollateralInterface } from "@/utils/Addresses";
 
 const ReservesPage = () => {
   const [collateralDeposit, setCollateralDeposit] = useState(0);
@@ -18,8 +20,20 @@ const ReservesPage = () => {
   const [reservesDeposit, setReservesDeposit] = useState(0);
   const [reservesWithdraw, setReservesWithdraw] = useState(0);
 
-  const handleCollateralDeposit = (amount) => {
-    setCollateralDeposit(collateralDeposit + amount);
+  const handleCollateralDeposit = async (amount) => {
+    try {
+      const linkToken = await getLinkToken();
+      const tx = await linkToken.approve(
+        CollateralInterface,
+        collateralDeposit
+      );
+      await tx.wait();
+      const collateral = await getCollateralInterFace();
+      const tx2 = await collateral.depositCollateral(collateralDeposit);
+      await tx2.wait();
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const handleCollateralWithdraw = (amount) => {
@@ -37,7 +51,7 @@ const ReservesPage = () => {
   return (
     <>
       <Header />
-      <Flex h="100vh" alignItems="center" justifyContent="center" gap={8}>
+      <Flex alignItems="center" justifyContent="center" w="auto" gap={8} p={10}>
         <Box
           p={8}
           borderWidth={1}
@@ -55,12 +69,16 @@ const ReservesPage = () => {
                 variant="outline"
                 borderColor={"blue"}
                 size="lg"
-                w="300px"
+                w="200px"
                 onChange={(e) =>
-                  handleCollateralDeposit(parseFloat(e.target.value))
+                  setCollateralDeposit(parseFloat(e.target.value))
                 }
               />
-              <Button colorScheme="green" variant={"outline"}>
+              <Button
+                colorScheme="green"
+                variant={"outline"}
+                onClick={handleCollateralDeposit}
+              >
                 Deposit
               </Button>
             </HStack>
@@ -70,7 +88,7 @@ const ReservesPage = () => {
                 variant="outline"
                 borderColor={"pink"}
                 size="lg"
-                w="300px"
+                w="200px"
                 onChange={(e) =>
                   handleCollateralWithdraw(parseFloat(e.target.value))
                 }
@@ -103,7 +121,7 @@ const ReservesPage = () => {
                 variant="outline"
                 borderColor={"blue"}
                 size="lg"
-                w="300px"
+                w="200px"
                 onChange={(e) =>
                   handleReservesDeposit(parseFloat(e.target.value))
                 }
@@ -118,7 +136,7 @@ const ReservesPage = () => {
                 variant="outline"
                 borderColor={"pink"}
                 size="lg"
-                w="300px"
+                w="200px"
                 onChange={(e) =>
                   handleReservesWithdraw(parseFloat(e.target.value))
                 }
@@ -128,11 +146,38 @@ const ReservesPage = () => {
               </Button>
             </HStack>
             <Text>
-              Current Reserves Balance: {reservesDeposit - reservesWithdraw}
+              Current KelCOIN Balance: {reservesDeposit - reservesWithdraw}
             </Text>
           </Flex>
         </Box>
       </Flex>
+      <Center>
+        <Box
+          p={8}
+          borderWidth={1}
+          borderRadius={8}
+          boxShadow="lg"
+          borderColor="#FF6B35"
+        >
+          <Heading mb={4} color="#FF6B35">
+            Mint Game Assets
+          </Heading>
+          <Flex direction="column" alignItems="center" gap={4}>
+            <HStack>
+              <Input
+                placeholder="Asset Name"
+                variant="outline"
+                borderColor={"blue"}
+                size="lg"
+                w="200px"
+              />
+              <Button colorScheme="green" variant={"outline"}>
+                Mint
+              </Button>
+            </HStack>
+          </Flex>
+        </Box>
+      </Center>
     </>
   );
 };
