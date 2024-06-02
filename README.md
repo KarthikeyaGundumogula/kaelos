@@ -1,66 +1,12 @@
-## Foundry
-
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
-
-Foundry consists of:
-
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
-
-## Documentation
-
-https://book.getfoundry.sh/
-
-## Usage
-
-### Build
-
-```shell
-$ forge build
-```
-
-### Test
-
-```shell
-$ forge test
-```
-
-### Format
-
-```shell
-$ forge fmt
-```
-
-### Gas Snapshots
-
-```shell
-$ forge snapshot
-```
-
-### Anvil
-
-```shell
-$ anvil
-```
-
-### Deploy
-
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
-
-### Cast
-
-```shell
-$ cast <subcommand>
-```
-
-### Help
-
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```
+BSC chain Link CollateralId: 0x544553544253434c494e4b000000000000000000000000000000000000000000
+Kelos Stable Coin: 0x006220B9b3E8720BfCBB6564431427e98EEF76Bd
+RateAggregator : 0xae53Ba4e88eEC5a367aEe5eaefFAeC15e5F58404
+HeadStation : 0xC684a7E13F04E47D208211Ee69c8389Cf30fBF6a
+KelCoinTeller : 0xef08E9368D69075396574d871aE58c86937Df6ee
+Collateral Teller : 0x7e6199DB31F79C668C5a36b4Cca3F353b57c0162 (on Amoy)
+Auction House : 0xd415544e2646718482409a62d36133b6Db200BdA
+Liquidation Station : 0x5A1D329c74b7146A1AfBbF12e344b22530E0934F
+Game Assets : 0xD9D258Bb22b7B306343dB9D9BAFC61feEB2F8419
+Game Station : 0xbd599e13A7937f0396ade2F9Ca83198Aa2530464
+Asset Warehouse : 0xc48242dF9461db6a3c56DE032cbD427Eae1c13cb
+Collateral Interface : 0x8BB139330Bd244bcA71b705D381b35eE49AB3026 (on tbsc)
