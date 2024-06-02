@@ -93,7 +93,7 @@ contract CollateralTeller is CCIPReceiver, OwnerIsCreator {
     event CollateralTokenWithdrawn(address user, uint amount);
     event StausUpdated(bool status);
     event MessageFailed(bytes32 indexed messageId, bytes reason);
-    string private s_lastReceivedText;
+    // string private s_lastReceivedText;
 
     event AcknowledgmentSent(
         bytes32 indexed acknowledgingMessageId,
