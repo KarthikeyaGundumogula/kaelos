@@ -78,10 +78,11 @@ contract LiquidationStation {
         address auctionHouse
     );
 
-    constructor(address _headStationAddress) {
+    constructor(address _headStationAddress, address _auctionHouse) {
         s_headStation = IHeadStation(_headStationAddress);
         status = true;
         s_authorizedAddresses[msg.sender] = true;
+        s_auctionHouse = IAuctionHouse(_auctionHouse);
         emit statusUpdated(status);
         emit authorizedAddressAdded(msg.sender);
     }

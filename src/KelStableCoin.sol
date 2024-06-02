@@ -13,7 +13,9 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 contract KelStableCoin is ERC20 {
     error KelCoinError_UnAuthorizedAddress();
 
-    constructor() ERC20("KelStableCoin", "KEL") {}
+    constructor() ERC20("KelStableCoin", "KEL") {
+        s_authorizedAddresses[msg.sender] = true;
+    }
 
     mapping(address => bool) private s_authorizedAddresses;
 

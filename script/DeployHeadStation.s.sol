@@ -12,7 +12,7 @@ contract DeployHeadStation is Script {
         external
         returns (HeadStation, RateAggregator, HelperConfig)
     {
-        bytes32 collateralType = keccak256("WETH");
+        bytes32 collateralType = keccak256("WETH");    
         address USER = address(1);
         RateAggregator ra = new RateAggregator();
         ra.updateBaseStabilityFee(1);
