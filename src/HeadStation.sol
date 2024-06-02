@@ -9,6 +9,7 @@ pragma solidity ^0.8.20;
 
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import {PriceFeedLib} from "./libraries/PriceFeedLib.sol";
+import {console} from "forge-std/console.sol";
 
 interface IRateAggregator {
     function calculateStabilityRate(
@@ -166,7 +167,7 @@ contract HeadStation {
             revert HeadStationError_UnRecognozedCollateralType();
         }
         _updateRate(_collateralId);
-        s_totalKSCDebt = _sub(s_totalKSCDebt, _amount);
+        s_totalKSCDebt = _add(s_totalKSCDebt, _amount);
         uint256 rate = s_collaterals[_collateralId].stabilityRate;
         uint256 normalizedAmount = _amount / rate;
         s_reserves[_collateralId][_user]._totalKSCMinted = _add(
@@ -224,6 +225,11 @@ contract HeadStation {
     ) external returns (uint256 safetyIndex, uint256 stabilityRate) {
         safetyIndex = _calculateSafetyIndex(_collateralId, _user);
         stabilityRate = s_collaterals[_collateralId].stabilityRate;
+    }
+
+    function getReserves(bytes32 _collateralId, address _user) external view returns(uint256 collateral,uint256 debt){
+        collateral = s_reserves[_collateralId][_user]._totalCollateral;
+        debt = s_reserves[_collateralId][_user]._totalKSCMinted;
     }
 
     function getCollateralTokenData(

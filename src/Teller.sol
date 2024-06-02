@@ -14,18 +14,7 @@ interface IKelCoin {
 }
 
 interface HeadStation {
-    function depositCollateral(
-        bytes32 _collateralType,
-        uint256 _amount,
-        address _user
-    ) external;
-
-    function withdrawCollateral(
-        bytes32 _collateralType,
-        uint256 _amount,
-        address _user
-    ) external;
-
+    
     function depositKSC(
         bytes32 _collateralType,
         uint256 _amount,
