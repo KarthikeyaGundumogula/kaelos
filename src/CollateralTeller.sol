@@ -106,8 +106,15 @@ contract CollateralTeller is CCIPReceiver, OwnerIsCreator {
         string txType
     );
 
-    constructor(address _router, address _link) CCIPReceiver(_router) {
+    constructor(
+        address _router,
+        address _link,
+        address _headStation,
+        bytes32 _collateralType
+    ) CCIPReceiver(_router) {
         s_linkToken = IERC20(_link);
+        s_headStation = HeadStation(_headStation);
+        s_collateralType = _collateralType;
     }
 
     function initRecevingContract(
