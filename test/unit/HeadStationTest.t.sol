@@ -15,7 +15,7 @@ contract TestHeadStation is Test {
     address weth;
     address USER = address(1);
     address USER2 = address(2);
-    uint256 DEPOSITAMOUNT = 1 ether;
+    uint256 DEPOSITAMOUNT = 10 ether;
     bytes32 collateralType = keccak256("WETH");
     uint256 WITHDRAWAMOUNT = 1 ether;
 
