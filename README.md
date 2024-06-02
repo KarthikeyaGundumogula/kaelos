@@ -20,6 +20,7 @@ Kaelos Protocol is an innovative blockchain gaming and DeFi ecosystem built on t
 ## Overview
 
 Kaelos Protocol offers an ideal environment for blockchain-based gaming and decentralized finance. The protocol includes several components:
+
 - **Games and Players**: Core participants who interact through a decentralized gamer graph.
 - **Ad Network**: A decentralized network providing monetization options.
 - **Marketplace**: A platform for trading in-game assets.
@@ -29,6 +30,7 @@ Kaelos Protocol offers an ideal environment for blockchain-based gaming and dece
 ## Architecture
 
 Kaelos Protocol's architecture includes the following smart contracts and components:
+
 - **Game Vaults**: Over-collateralized system for minting stable coins.
 - **Asset Vaults**: Under-collateralized system for minting in-game assets.
 - **Auction House**: Manages the liquidation of assets.
@@ -39,20 +41,26 @@ Kaelos Protocol's architecture includes the following smart contracts and compon
 ## Key Components
 
 ### Game Vaults
+
 - **Function**: Manage collateral and mint stablecoins.
 - **Mechanism**: Over-collateralized to ensure protocol stability.
 
 ### Asset Vaults
+
 - **Function**: Allow games to mint in-game assets.
 - **Mechanism**: Under-collateralized to provide flexibility for game developers.
 
 ### Auction House
+
 - **Function**: Facilitates the auctioning of assets during liquidation events.
 - **Mechanism**: Ensures fair and efficient liquidation processes.
 
 ### Liquidation Station
+
 - **Function**: Manages and executes the liquidation of assets.
 - **Mechanism**: Coordinates with Keepers to handle gas-intensive operations.
+
+![alt architecture](https://raw.githubusercontent.com/KarthikeyaGundumogula/kaelos/main/KaelosArchitecture.png)
 
 ## Workflow
 
